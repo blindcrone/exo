@@ -26,6 +26,7 @@ class DeviceCapabilities:
   chip: str
   memory: int
   flops: DeviceFlops
+  cores: int = 0
 
   def __str__(self):
     return f"Model: {self.model}. Chip: {self.chip}. Memory: {self.memory}MB. Flops: {self.flops}"
@@ -35,10 +36,10 @@ class DeviceCapabilities:
       self.flops = DeviceFlops(**self.flops)
 
   def to_dict(self):
-    return {"model": self.model, "chip": self.chip, "memory": self.memory, "flops": self.flops.to_dict()}
+    return {"model": self.model, "chip": self.chip, "memory": self.memory, "flops": self.flops.to_dict(), "cores": self.cores}
 
 
-UNKNOWN_DEVICE_CAPABILITIES = DeviceCapabilities(model="Unknown Model", chip="Unknown Chip", memory=0, flops=DeviceFlops(fp32=0, fp16=0, int8=0))
+UNKNOWN_DEVICE_CAPABILITIES = DeviceCapabilities(model="Unknown Model", chip="Unknown Chip", memory=0, flops=DeviceFlops(fp32=0, fp16=0, int8=0), cores=psutil.cpu_count())
 
 CHIP_FLOPS = {
   # Source: https://www.cpu-monkey.com
@@ -163,17 +164,18 @@ def mac_device_capabilities() -> DeviceCapabilities:
     memory = memory_value
 
   # Assuming static values for other attributes for demonstration
-  return DeviceCapabilities(model=model_id, chip=chip_id, memory=memory, flops=CHIP_FLOPS.get(chip_id, DeviceFlops(fp32=0, fp16=0, int8=0)))
+  return DeviceCapabilities(model=model_id, chip=chip_id, memory=memory, flops=CHIP_FLOPS.get(chip_id, DeviceFlops(fp32=0, fp16=0, int8=0)), cores=psutil.cpu_count())
 
 
 def linux_device_capabilities() -> DeviceCapabilities:
   import psutil
   from tinygrad import Device
+  from socket import gethostname
+  hostname = gethostname()
 
   if DEBUG >= 2: print(f"tinygrad {Device.DEFAULT=}")
   if Device.DEFAULT == "CUDA" or Device.DEFAULT == "NV" or Device.DEFAULT == "GPU":
     import pynvml
-
     pynvml.nvmlInit()
     handle = pynvml.nvmlDeviceGetHandleByIndex(0)
     gpu_name = pynvml.nvmlDeviceGetName(handle).upper()
@@ -182,23 +184,18 @@ def linux_device_capabilities() -> DeviceCapabilities:
     if DEBUG >= 2: print(f"NVIDIA device {gpu_name=} {gpu_memory_info=}")
 
     return DeviceCapabilities(
-      model=f"Linux Box ({gpu_name})",
+      model=f"{hostname} (Linux/CUDA)",
       chip=gpu_name,
       memory=gpu_memory_info.total // 2**20,
       flops=CHIP_FLOPS.get(gpu_name, DeviceFlops(fp32=0, fp16=0, int8=0)),
-    )
-  elif Device.DEFAULT == "AMD":
-    # TODO AMD support
-    return DeviceCapabilities(
-      model="Linux Box (AMD)",
-      chip="Unknown AMD",
-      memory=psutil.virtual_memory().total // 2**20,
-      flops=DeviceFlops(fp32=0, fp16=0, int8=0),
+      cores=pynvml.nvmlDeviceGetNumGpuCores(handle)
     )
   else:
+    # TODO AMD support
     return DeviceCapabilities(
-      model=f"Linux Box (Device: {Device.DEFAULT})",
-      chip=f"Unknown Chip (Device: {Device.DEFAULT})",
+      model=f"{hostname} (Linux)",
+      chip="Unknown (Device: {Device.DEFAULT})",
       memory=psutil.virtual_memory().total // 2**20,
       flops=DeviceFlops(fp32=0, fp16=0, int8=0),
+      cores=psutil.cpu_count()
     )

@@ -194,32 +194,30 @@ def get_or_create_node_id():
     if DEBUG >= 2: print(f"Unexpected error creating node_id: {e}")
     return str(uuid.uuid4())
 
+def pretty_print_with_prefix(num: int) -> (str, str):
+  if num < 1024:
+    return f"{num}", ""
+  elif num < 1024**2:
+    return f"{num / 1024:.2f}", "K"
+  elif num < 1024**3:
+    return f"{num / (1024 ** 2):.2f}", "M"
+  elif num < 1024**4:
+    return f"{num / (1024 ** 3):.2f}", "G"
+  elif num < 1024**5:
+    return f"{num / (1024 ** 3):.2f}", "T"
+  else:
+    return f"{num / (1024 ** 4):.2f}", "P"
+
+def pretty_print_rate(freq_in_hz: int) -> str:
+  rate, prefix = pretty_print_with_prefix(freq_in_hz)
+  return f"{rate} {prefix}Hz"
 
 def pretty_print_bytes(size_in_bytes: int) -> str:
-  if size_in_bytes < 1024:
-    return f"{size_in_bytes} B"
-  elif size_in_bytes < 1024**2:
-    return f"{size_in_bytes / 1024:.2f} KB"
-  elif size_in_bytes < 1024**3:
-    return f"{size_in_bytes / (1024 ** 2):.2f} MB"
-  elif size_in_bytes < 1024**4:
-    return f"{size_in_bytes / (1024 ** 3):.2f} GB"
-  else:
-    return f"{size_in_bytes / (1024 ** 4):.2f} TB"
-
+  size, prefix = pretty_print_with_prefix(size_in_bytes)
+  return f"{size} {prefix}B"
 
 def pretty_print_bytes_per_second(bytes_per_second: int) -> str:
-  if bytes_per_second < 1024:
-    return f"{bytes_per_second} B/s"
-  elif bytes_per_second < 1024**2:
-    return f"{bytes_per_second / 1024:.2f} KB/s"
-  elif bytes_per_second < 1024**3:
-    return f"{bytes_per_second / (1024 ** 2):.2f} MB/s"
-  elif bytes_per_second < 1024**4:
-    return f"{bytes_per_second / (1024 ** 3):.2f} GB/s"
-  else:
-    return f"{bytes_per_second / (1024 ** 4):.2f} TB/s"
-
+  return f"{pretty_print_bytes(bytes_per_second)}/s"
 
 def get_all_ip_addresses():
   try:

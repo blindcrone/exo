@@ -1,7 +1,7 @@
 import math
 from collections import OrderedDict
 from typing import List, Optional, Tuple, Dict
-from exo.helpers import exo_text, pretty_print_bytes, pretty_print_bytes_per_second
+from exo.helpers import exo_text, pretty_print_bytes, pretty_print_bytes_per_second, pretty_print_rate
 from exo.topology.topology import Topology
 from exo.topology.partitioning_strategy import Partition
 from exo.download.hf.hf_helpers import RepoProgressEvent
@@ -213,7 +213,7 @@ class TopologyViz:
       # Place node info (model, memory, TFLOPS, partition) on three lines
       node_info = [
         f"{device_capabilities.model} {device_capabilities.memory // 1024}GB",
-        f"{device_capabilities.flops.fp16}TFLOPS",
+        f"{device_capabilities.cores} compute cores",
         f"[{partition.start:.2f}-{partition.end:.2f}]",
       ]
 

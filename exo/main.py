@@ -12,6 +12,7 @@ from exo.networking.udp.udp_discovery import UDPDiscovery
 from exo.networking.tailscale.tailscale_discovery import TailscaleDiscovery
 from exo.networking.grpc.grpc_peer_handle import GRPCPeerHandle
 from exo.topology.ring_memory_weighted_partitioning_strategy import RingMemoryWeightedPartitioningStrategy
+from exo.topology.core_memory_weighted_partitioning_strategy import CoreMemoryWeightedPartitioningStrategy
 from exo.api import ChatGPTAPI
 from exo.download.shard_download import ShardDownloader, RepoProgressEvent
 from exo.download.hf.hf_shard_download import HFShardDownloader
@@ -33,6 +34,7 @@ parser.add_argument("--node-port", type=int, default=None, help="Node port")
 parser.add_argument("--listen-port", type=int, default=5678, help="Listening port for discovery")
 parser.add_argument("--download-quick-check", action="store_true", help="Quick check local path for model shards download")
 parser.add_argument("--max-parallel-downloads", type=int, default=4, help="Max parallel downloads for model shards download")
+parser.add_argument("--partitioning-strategy", type=str, default="CoreMemory", help="Strategy for dividing up the model")
 parser.add_argument("--prometheus-client-port", type=int, default=None, help="Prometheus client port")
 parser.add_argument("--broadcast-port", type=int, default=5678, help="Broadcast port for discovery")
 parser.add_argument("--discovery-module", type=str, choices=["udp", "tailscale"], default="udp", help="Discovery module to use")
@@ -79,12 +81,15 @@ if args.discovery_module == "udp":
 elif args.discovery_module == "tailscale":
   discovery = TailscaleDiscovery(args.node_id, args.node_port, lambda peer_id, address, device_capabilities: GRPCPeerHandle(peer_id, address, device_capabilities), discovery_timeout=args.discovery_timeout, tailscale_api_key=args.tailscale_api_key, tailnet=args.tailnet_name)
 topology_viz = TopologyViz(chatgpt_api_endpoints=chatgpt_api_endpoints, web_chat_urls=web_chat_urls) if not args.disable_tui else None
+
+partitioning_strategy=RingMemoryWeightedPartitioningStrategy() if args.partitioning_strategy == "RingMemory" else CoreMemoryWeightedPartitioningStrategy()
+
 node = StandardNode(
   args.node_id,
   None,
   inference_engine,
   discovery,
-  partitioning_strategy=RingMemoryWeightedPartitioningStrategy(),
+  partitioning_strategy=partitioning_strategy,
   max_generate_tokens=args.max_generate_tokens,
   topology_viz=topology_viz
 )
