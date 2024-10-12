@@ -186,7 +186,7 @@ def linux_device_capabilities() -> DeviceCapabilities:
     return DeviceCapabilities(
       model=f"{hostname} (Linux/CUDA)",
       chip=gpu_name,
-      memory=gpu_memory_info.total // 2**20,
+      memory=gpu_memory_info.total,
       flops=CHIP_FLOPS.get(gpu_name, DeviceFlops(fp32=0, fp16=0, int8=0)),
       cores=pynvml.nvmlDeviceGetNumGpuCores(handle)
     )
@@ -195,7 +195,7 @@ def linux_device_capabilities() -> DeviceCapabilities:
     return DeviceCapabilities(
       model=f"{hostname} (Linux)",
       chip="Unknown (Device: {Device.DEFAULT})",
-      memory=psutil.virtual_memory().total // 2**20,
+      memory=psutil.virtual_memory().total,
       flops=DeviceFlops(fp32=0, fp16=0, int8=0),
       cores=psutil.cpu_count()
     )

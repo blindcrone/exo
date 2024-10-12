@@ -10,7 +10,7 @@ from exo.inference.inference_engine import InferenceEngine, Shard
 from .node import Node
 from exo.topology.topology import Topology
 from exo.topology.device_capabilities import device_capabilities
-from exo.topology.partitioning_strategy import Partition, PartitioningStrategy, map_partitions_to_shards
+from exo.topology.partitioning_strategy import Partition, PartitioningStrategy
 from exo import DEBUG
 from exo.helpers import AsyncCallbackSystem
 from exo.viz.topology_viz import TopologyViz
@@ -29,6 +29,7 @@ class StandardNode(Node):
     topology_viz: Optional[TopologyViz] = None,
   ):
     self.id = _id
+    self.available = True
     self.inference_engine = inference_engine
     self.server = server
     self.discovery = discovery
@@ -39,6 +40,8 @@ class StandardNode(Node):
     self.buffered_token_output: Dict[str, Tuple[List[int], bool]] = {}
     self.max_generate_tokens = max_generate_tokens
     self.topology_viz = topology_viz
+    self.shards = None
+    self.current_model = None
     self._on_token = AsyncCallbackSystem[str, Tuple[str, List[int], bool]]()
     self._on_opaque_status = AsyncCallbackSystem[str, Tuple[str, str]]()
     self._on_opaque_status.register("node_status").on_next(self.on_node_status)
@@ -71,7 +74,7 @@ class StandardNode(Node):
         download_progress = RepoProgressEvent.from_dict(status_data.get('progress'))
         self.node_download_progress[status_data.get('node_id')] = download_progress
       if self.topology_viz:
-        self.topology_viz.update_visualization(self.current_topology, self.partitioning_strategy.partition(self.current_topology), self.id, self.node_download_progress)
+        self.topology_viz.update_visualization( self.current_topology, self.partitioning_strategy.partition(self.current_topology) if self.current_model is None else self.partitioning_strategy.repartition(self.current_topology, self.current_model.n_layers), self.id, self.node_download_progress)
     except Exception as e:
       if DEBUG >= 1: print(f"Error updating visualization: {e}")
       if DEBUG >= 1: traceback.print_exc()
@@ -240,15 +243,14 @@ class StandardNode(Node):
       if DEBUG >= 1: print("No partitioning strategy found. Skipping forward.")
       return
     shard = self.get_current_shard(base_shard)
+    partitions = self.partitioning_strategy.repartition(self.current_topology, self.current_model.n_layers)
 
-    partitions = self.partitioning_strategy.partition(self.topology)
-    shards = map_partitions_to_shards(self.partitioning_strategy.partition(self.topology), base_shard.n_layers, base_shard.model_id)
     current_partition_index = next((i for i, p in enumerate(partitions) if p.node_id == self.id), None)
     if DEBUG >= 1: print(f"Current partition index: {current_partition_index}")
     if current_partition_index is not None:
       next_partition_index = (current_partition_index+1) % len(partitions)
       next_partition: Partition = partitions[next_partition_index]
-      next_shard = shards[next_partition_index]
+      next_shard = self.shards[next_partition_index]
       if DEBUG >= 2: print(f"Computed next from: {shard}, {self.topology}. Next partition: {next_partition}")
 
       if next_partition.node_id == self.id:
@@ -269,13 +271,18 @@ class StandardNode(Node):
       else:
         await target_peer.send_prompt(next_shard, tensor_or_prompt, image_str=image_str, request_id=request_id, inference_state=inference_state)
 
+  def update_shards(self, base_shard: Shard):
+    if self.shards is None or self.current_model.model_id != base_shard.model_id:
+        self.current_model = base_shard
+        self.shards = self.partitioning_strategy.allocate(self.topology, base_shard.n_layers, base_shard.model_id)
+
   def get_current_shard(self, base_shard: Shard) -> Shard:
-    partitions = self.partitioning_strategy.partition(self.topology)
-    shards = map_partitions_to_shards(partitions, base_shard.n_layers, base_shard.model_id)
+    self.update_shards(base_shard)
+    partitions = self.partitioning_strategy.repartition(self.current_topology, self.current_model.n_layers)
     current_partition_index = next((i for i, p in enumerate(partitions) if p.node_id == self.id), None)
     if current_partition_index is None:
       raise ValueError(f"No current partition found for node: {self.id}")
-    return shards[current_partition_index]
+    return self.shards[current_partition_index]
 
   async def update_peers(self, wait_for_peers: int = 0) -> bool:
     next_peers = await self.discovery.discover_peers(wait_for_peers)

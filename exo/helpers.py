@@ -208,6 +208,13 @@ def pretty_print_with_prefix(num: int) -> (str, str):
   else:
     return f"{num / (1024 ** 4):.2f}", "P"
 
+def pretty_print_order(n: int) -> str:
+  digit = n % 10
+  if digit == 1: return f"{n}st"
+  elif digit == 2: return f"{n}nd"
+  elif digit == 3: return f"{n}rd"
+  else: return f"{s}th"
+
 def pretty_print_rate(freq_in_hz: int) -> str:
   rate, prefix = pretty_print_with_prefix(freq_in_hz)
   return f"{rate} {prefix}Hz"

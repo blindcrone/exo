@@ -213,7 +213,7 @@ class TopologyViz:
       # Place node info (model, memory, TFLOPS, partition) on three lines
       node_info = [
         f"{device_capabilities.model}",
-        f"{device_capabilities.cores} cores :: {device_capabilities.memory // 1024}GB RAM",
+        f"{device_capabilities.cores} cores :: {pretty_print_bytes(device_capabilities.memory)} RAM",
         f"[{partition.start:.2f}-{partition.end:.2f}]",
       ]
 
@@ -222,6 +222,13 @@ class TopologyViz:
       info_distance_y = radius_y + 3
       info_x = int(center_x + info_distance_x*math.cos(angle))
       info_y = int(center_y + info_distance_y*math.sin(angle))
+
+      # Draw line to next node
+      next_i = (i+1) % num_partitions
+      next_angle = 2*math.pi*next_i/num_partitions
+      next_x = int(center_x + radius_x*math.cos(next_angle))
+      next_y = int(center_y + radius_y*math.sin(next_angle))
+
 
       # Adjust text position to avoid overwriting the node icon and prevent cutoff
       if info_x < x:
@@ -236,18 +243,6 @@ class TopologyViz:
         info_x += 3
         info_y -= 2
 
-      for j, line in enumerate(node_info):
-        for k, char in enumerate(line):
-          if 0 <= info_y + j < 48 and 0 <= info_x + k < 100:
-            if info_y + j != y or info_x + k != x:
-              visualization[info_y + j][info_x + k] = char
-
-      # Draw line to next node
-      next_i = (i+1) % num_partitions
-      next_angle = 2*math.pi*next_i/num_partitions
-      next_x = int(center_x + radius_x*math.cos(next_angle))
-      next_y = int(center_y + radius_y*math.sin(next_angle))
-
       # Simple line drawing
       steps = max(abs(next_x - x), abs(next_y - y))
       for step in range(1, steps):
@@ -255,6 +250,12 @@ class TopologyViz:
         line_y = int(y + (next_y-y)*step/steps)
         if 0 <= line_y < 48 and 0 <= line_x < 100:
           visualization[line_y][line_x] = "-"
+
+      for j, line in enumerate(node_info):
+        for k, char in enumerate(line):
+          if 0 <= info_y + j < 48 and 0 <= info_x + k < 100:
+            if info_y + j != y or info_x + k != x:
+              visualization[info_y + j][info_x + k] = char
 
     # Convert to string
     return "\n".join("".join(str(char) for char in row) for row in visualization)
