@@ -1,5 +1,6 @@
 import numpy as np
 import mlx.core as mx
+import mlx.nn as nn
 from ..inference_engine import InferenceEngine
 from .sharded_model import StatefulShardedModel
 from .sharded_utils import load_shard, get_image_from_str
@@ -10,12 +11,26 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
+def bce_loss(model, inputs, targets, lengths):
+    # Run model on inputs
+    logits = model(inputs)
+    logits = logits.astype(mx.float32)
+
+    # Mask padding tokens
+    length_mask = mx.arange(inputs.shape[1])[None, :] < lengths[:, None]
+
+    # Calculate the loss
+    ce = nn.losses.cross_entropy(logits, targets) * length_mask
+    ntoks = length_mask.sum()
+    ce = ce.sum() / ntoks
+    return ce, ntoks
 
 class MLXDynamicShardInferenceEngine(InferenceEngine):
   def __init__(self, shard_downloader: ShardDownloader):
     self.shard = None
     self.shard_downloader = shard_downloader
     self.executor = ThreadPoolExecutor(max_workers=1)
+    self.loss = bce_loss
 
   async def infer_prompt(self, request_id: str, shard: Shard, prompt: str, image_str: Optional[str] = None, inference_state: Optional[str] = None) -> (np.ndarray, str, bool):
     await self.ensure_shard(shard)
@@ -37,6 +52,21 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     output_data: np.ndarray = np.array(await asyncio.get_running_loop().run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, mx.array(input_data)))
     return output_data, "", output_data.size == 1 and output_data.item() == self.tokenizer.eos_token_id
 
+  async def infer_prompt(self, request_id: str, shard: Shard, prompt: str, image_str: Optional[str] = None, inference_state: Optional[str] = None) -> (np.ndarray, str, bool):
+    await self.ensure_shard(shard)
+    loop = asyncio.get_running_loop()
+    if image_str:
+      image = await get_image_from_str(image_str)
+      tokenize = partial(self.tokenizer, prompt, image, return_tensors="np")
+      inputs = await loop.run_in_executor(self.executor, tokenize)
+      pixel_values = mx.array(inputs["pixel_values"])
+      input_ids = mx.array(inputs["input_ids"])
+      output_data: np.ndarray = np.array(await loop.run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, input_ids, pixel_values))
+    else:
+      input_ids = mx.array(await loop.run_in_executor(self.executor, self.tokenizer.encode, prompt))
+      output_data: np.ndarray = np.array(await loop.run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, input_ids))
+    return output_data, "", output_data.size == 1 and output_data.item() == self.tokenizer.eos_token_id
+
   async def ensure_shard(self, shard: Shard):
     if self.shard == shard:
       return
@@ -52,3 +82,4 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
       model_shard, self.tokenizer = await loop.run_in_executor(self.executor, load_shard_wrapper)
       self.stateful_sharded_model = await loop.run_in_executor(self.executor, StatefulShardedModel, shard, model_shard)
       self.shard = shard
+     

@@ -6,9 +6,11 @@ import logging
 import time
 import traceback
 import uuid
+import numpy as np
 from exo.networking.manual.manual_discovery import ManualDiscovery
 from exo.networking.manual.network_topology_config import NetworkTopology
 from exo.orchestration.standard_node import StandardNode
+from exo.orchestration.training_node import TrainingNode
 from exo.networking.grpc.grpc_server import GRPCServer
 from exo.networking.udp.udp_discovery import UDPDiscovery
 from exo.networking.tailscale.tailscale_discovery import TailscaleDiscovery
@@ -25,16 +27,21 @@ from exo.inference.tokenizers import resolve_tokenizer
 from exo.orchestration.node import Node
 from exo.models import model_base_shards
 from exo.viz.topology_viz import TopologyViz
+from exo.train.dataset import load_dataset
 
 # parse args
 parser = argparse.ArgumentParser(description="Initialize GRPC Discovery")
-parser.add_argument("command", nargs="?", choices=["run"], help="Command to run")
+parser.add_argument("command", nargs="?", choices=["run", "train"], help="Command to run")
 parser.add_argument("model_name", nargs="?", help="Model name to run")
 parser.add_argument("--node-id", type=str, default=None, help="Node ID")
 parser.add_argument("--node-host", type=str, default="0.0.0.0", help="Node host")
+parser.add_argument("--batch-size", type=int, default=4, help="Minibatch size.")
 parser.add_argument("--node-port", type=int, default=None, help="Node port")
 parser.add_argument("--listen-port", type=int, default=5678, help="Listening port for discovery")
 parser.add_argument("--download-quick-check", action="store_true", help="Quick check local path for model shards download")
+parser.add_argument("--train-proto", action="store_true", help="Lora training prototype")
+parser.add_argument("--iters", type=int, default=1000, help="Number of iterations to train for")
+parser.add_argument("--data", type=str, default="exo/train/data/lora", help="Directory with {train, valid, test}.jsonl files")
 parser.add_argument("--max-parallel-downloads", type=int, default=4, help="Max parallel downloads for model shards download")
 parser.add_argument("--prometheus-client-port", type=int, default=None, help="Prometheus client port")
 parser.add_argument("--broadcast-port", type=int, default=5678, help="Broadcast port for discovery")
@@ -42,7 +49,7 @@ parser.add_argument("--discovery-module", type=str, choices=["udp", "tailscale",
 parser.add_argument("--discovery-timeout", type=int, default=30, help="Discovery timeout in seconds")
 parser.add_argument("--discovery-config-path", type=str, default=None, help="Path to discovery config json file")
 parser.add_argument("--wait-for-peers", type=int, default=0, help="Number of peers to wait to connect to before starting")
-parser.add_argument("--chatgpt-api-port", type=int, default=8000, help="ChatGPT API port")
+parser.add_argument("--chatgpt-api-port", type=int, default=8765, help="ChatGPT API port")
 parser.add_argument("--chatgpt-api-response-timeout", type=int, default=90, help="ChatGPT API response timeout in seconds")
 parser.add_argument("--max-generate-tokens", type=int, default=10000, help="Max tokens to generate in each request")
 parser.add_argument("--inference-engine", type=str, default=None, help="Inference engine to use (mlx, tinygrad, or dummy)")
@@ -105,7 +112,16 @@ elif args.discovery_module == "manual":
     raise ValueError(f"--discovery-config-path is required when using manual discovery. Please provide a path to a config json file.")
   discovery = ManualDiscovery(args.discovery_config_path, args.node_id, create_peer_handle=lambda peer_id, address, device_capabilities: GRPCPeerHandle(peer_id, address, device_capabilities))
 topology_viz = TopologyViz(chatgpt_api_endpoints=chatgpt_api_endpoints, web_chat_urls=web_chat_urls) if not args.disable_tui else None
-node = StandardNode(
+node = TrainingNode(
+  args.node_id,
+  None,
+  inference_engine,
+  discovery,
+  partitioning_strategy=RingMemoryWeightedPartitioningStrategy(),
+  max_generate_tokens=args.max_generate_tokens,
+  topology_viz=topology_viz,
+  shard_downloader=shard_downloader
+) if args.command == "train" else StandardNode(
   args.node_id,
   None,
   inference_engine,
@@ -121,7 +137,7 @@ api = ChatGPTAPI(
   node,
   inference_engine.__class__.__name__,
   response_timeout=args.chatgpt_api_response_timeout,
-  on_chat_completion_request=lambda req_id, __, prompt: topology_viz.update_prompt(req_id, prompt) if topology_viz else None
+  on_chat_completion_request=lambda req_id, __, prompt: topology_viz.update_prompt(req_id, prompt) if topology_viz else None 
 )
 node.on_token.register("update_topology_viz").on_next(
   lambda req_id, tokens, __: topology_viz.update_prompt_output(req_id, inference_engine.tokenizer.decode(tokens)) if topology_viz and hasattr(inference_engine, "tokenizer") else None
@@ -201,6 +217,21 @@ async def run_model_cli(node: Node, inference_engine: InferenceEngine, model_nam
   finally:
     node.on_token.deregister(callback_id)
 
+async def train_model_cli(node: Node, inference_engine: InferenceEngine, model_name: str, iters: int, batch_size: int, data):
+  shard = model_base_shards.get(model_name, {}).get(inference_engine.__class__.__name__)
+  if not shard:
+    print(f"Error: Unsupported model '{model_name}' for inference engine {inference_engine.__class__.__name__}")
+    return
+  tokenizer = await resolve_tokenizer(shard.model_id)
+  indices = np.arange(len(data))
+  indices = np.random.permutation(indices)
+  batch = [data[indices[0 + i]] for i in range(batch_size)]
+  # Encode batch
+  responses = await node.process_batch(shard, batch)
+  for prompt, response in zip(batch, responses):
+    print("\nGenerated response:")
+    print(tokenizer.decode(tokens))
+
 
 async def main():
   loop = asyncio.get_running_loop()
@@ -220,6 +251,14 @@ async def main():
       print("Error: Model name is required when using 'run' command or --run-model")
       return
     await run_model_cli(node, inference_engine, model_name, args.prompt)
+  elif args.command == "train":
+    data_path = args.data
+    train_set, valid_set, test_set = load_dataset(data_path)
+    model_name = args.model_name or args.run_model
+    if not model_name:
+      print("Error: Model name is required when using 'train' command")
+      return
+    await train_model_cli(node, inference_engine, model_name, args.iters, args.batch_size, test_set)
   else:
     asyncio.create_task(api.run(port=args.chatgpt_api_port))  # Start the API server as a non-blocking task
     await asyncio.Event().wait()
