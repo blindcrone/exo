@@ -10,7 +10,6 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-
 class MLXDynamicShardInferenceEngine(InferenceEngine):
   def __init__(self, shard_downloader: ShardDownloader):
     self.shard = None
@@ -36,6 +35,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     await self.ensure_shard(shard)
     output_data: np.ndarray = np.array(await asyncio.get_running_loop().run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, mx.array(input_data)))
     return output_data, "", output_data.size == 1 and output_data.item() == self.tokenizer.eos_token_id
+
 
   async def ensure_shard(self, shard: Shard):
     if self.shard == shard:

@@ -4,6 +4,7 @@ import asyncio
 import uuid
 import time
 import traceback
+import numpy as np
 from typing import List, Dict, Optional, Tuple, Union, Set
 from exo.networking import Discovery, PeerHandle, Server
 from exo.inference.inference_engine import InferenceEngine, Shard
@@ -40,6 +41,7 @@ class StandardNode(Node):
     self.topology: Topology = Topology()
     self.device_capabilities = device_capabilities()
     self.buffered_token_output: Dict[str, Tuple[List[int], bool]] = {}
+    self.buffered_token_loss: Dict[str, np.ndarray] = {}
     self.max_generate_tokens = max_generate_tokens
     self.topology_viz = topology_viz
     self._on_token = AsyncCallbackSystem[str, Tuple[str, List[int], bool]]()
@@ -143,7 +145,7 @@ class StandardNode(Node):
     )
     return resp
 
-  async def _process_prompt(self, base_shard: Shard, prompt: str, image_str: Optional[str] = None, request_id: Optional[str] = None, inference_state: Optional[str] = None) -> Optional[np.ndarray]:
+  async def _process_prompt(self, base_shard: Shard, prompt: str, image_str: Optional[str] = None, request_id: Optional[str] = None, inference_state: Optional[str] = None, target: Optional[str] = None) -> Optional[np.ndarray]:
     if request_id is None:
       request_id = str(uuid.uuid4())
     if request_id not in self.buffered_token_output:
@@ -151,7 +153,7 @@ class StandardNode(Node):
     shard = self.get_current_shard(base_shard)
 
     if DEBUG >= 2: print(f"[{request_id}] process prompt: {base_shard=} {shard=} {prompt=} {image_str=}")
-    if shard.start_layer != 0:
+    if not shard.is_first_layer():
       if DEBUG >= 2: print(f"[{request_id}] forwarding to next shard: {base_shard=} {shard=} {prompt=} {image_str=}")
       await self.forward_to_next_shard(shard, prompt, request_id, image_str=image_str, inference_state=inference_state)
       return
@@ -160,6 +162,7 @@ class StandardNode(Node):
     is_finished = is_finished or len(self.buffered_token_output[request_id][0]) >= self.max_generate_tokens
     if is_finished:
       self.buffered_token_output[request_id] = (self.buffered_token_output[request_id][0], True)
+
     asyncio.create_task(self.broadcast_result(request_id, self.buffered_token_output[request_id][0], is_finished))  # TODO: this is n^2 communication complexity
 
     if result.size == 1:
