@@ -47,7 +47,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     self.shard_downloader = shard_downloader
     self.executor = ThreadPoolExecutor(max_workers=1)
 
-  async def sample(self, tensor, temp: float = 0.0, top_p: float = 1.0, logit_bias: Optional[Dict[int, float]] = None)
+  async def sample(self, tensor, temp: float = 0.0, top_p: float = 1.0, logit_bias: Optional[Dict[int, float]] = None):
     loop = asyncio.get_running_loop()
     logits = tensor[:, -1, :]
     return sample_from_logits(logits, temp, top_p, logit_bias=logit_bias)
