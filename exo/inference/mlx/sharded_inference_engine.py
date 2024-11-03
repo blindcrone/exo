@@ -38,7 +38,7 @@ def ce_loss(model, inputs, targets, lengths):
   # Run model on inputs
   logits, _ = model(inputs)
   logits = logits.astype(mx.float32)
-  return masked_ce_from_logits(logits, targets, lengths):
+  return masked_ce_from_logits(logits, targets, lengths)
 
 
 class MLXDynamicShardInferenceEngine(InferenceEngine):
