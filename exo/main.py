@@ -6,6 +6,7 @@ import logging
 import time
 import traceback
 import uuid
+import tqdm.asyncio
 from exo.networking.manual.manual_discovery import ManualDiscovery
 from exo.networking.manual.network_topology_config import NetworkTopology
 from exo.orchestration.standard_node import StandardNode
@@ -201,6 +202,23 @@ async def run_model_cli(node: Node, inference_engine: InferenceEngine, model_nam
   finally:
     node.on_token.deregister(callback_id)
 
+async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_name: str, data):
+  shard = model_base_shards.get(model_name, {}).get(inference_engine.__class__.__name__)
+  if not shard:
+    print(f"Error: Unsupported model '{model_name}' for inference engine {inference_engine.__class__.__name__}")
+    return
+  scores = []
+  n_tokens = 0
+  print(f"evaluating {len(data)} examples")
+  for example in tqdm(data):
+    request_id = str(uuid.uuid4())
+    if topology_viz:
+      topology_viz.update_prompt(request_id, prompt)
+    score, toks = await node.evaluate_prompt(shard, prompt, request_id) 
+    n_tokens += toks
+    scores.append(score * toks)
+  total_score = np.sum(scores) / n_tokens
+  print(f"score: {total_score}")
 
 async def main():
   loop = asyncio.get_running_loop()

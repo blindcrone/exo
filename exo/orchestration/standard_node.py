@@ -41,7 +41,9 @@ class StandardNode(Node):
     self.topology: Topology = Topology()
     self.device_capabilities = device_capabilities()
     self.buffered_token_output: Dict[str, Tuple[List[int], bool]] = {}
-    self.buffered_token_loss: Dict[str, np.ndarray] = {}
+    self.request_raw_output: Dict[str, Tuple[List[np.ndarray], bool]] = {}
+    self.request_target: Dict[str, Tuple[np.ndarray, int]] = {}
+    
     self.max_generate_tokens = max_generate_tokens
     self.topology_viz = topology_viz
     self._on_token = AsyncCallbackSystem[str, Tuple[str, List[int], bool]]()
@@ -145,11 +147,28 @@ class StandardNode(Node):
     )
     return resp
 
+  async def evaluate_prompt(self, base_shard: Shard, prompt: str, request_id: str):
+    while True:
+      if request_id not in self.request_target:
+        tokens = await self.inference_engine.encode(prompt)
+        length = len(tokens)
+        self.request_target[request_id] = (tokens[1:], length)
+      if request_id in self.request_raw_output and self.request_raw_output[1] == True:
+        batch = ( np.array([np.array(self.request_raw_output[request_id][0][:-1])])
+                , np.array([self.request_target[request_id][0]])
+                , [self.request_target[request_id][1]])
+        score = await node.inference_engine.evaluate_batch(batch)
+        return score
+      else:
+        await self.process_prompt(self, base_shard, request_id=request_id)
+  
   async def _process_prompt(self, base_shard: Shard, prompt: str, image_str: Optional[str] = None, request_id: Optional[str] = None, inference_state: Optional[str] = None, target: Optional[str] = None) -> Optional[np.ndarray]:
     if request_id is None:
       request_id = str(uuid.uuid4())
     if request_id not in self.buffered_token_output:
       self.buffered_token_output[request_id] = ([], False)
+    if request_id not in self.request_raw_output:
+      self.request_raw_output[request_id] = ([], False)
     shard = self.get_current_shard(base_shard)
 
     if DEBUG >= 2: print(f"[{request_id}] process prompt: {base_shard=} {shard=} {prompt=} {image_str=}")
@@ -158,16 +177,21 @@ class StandardNode(Node):
       await self.forward_to_next_shard(shard, prompt, request_id, image_str=image_str, inference_state=inference_state)
       return
 
-    result, inference_state, is_finished = await self.inference_engine.infer_prompt(request_id, shard, prompt, image_str, inference_state=inference_state)
-    is_finished = is_finished or len(self.buffered_token_output[request_id][0]) >= self.max_generate_tokens
-    if is_finished:
-      self.buffered_token_output[request_id] = (self.buffered_token_output[request_id][0], True)
+    result = await self.inference_engine.infer_prompt(request_id, shard, prompt, image_str, inference_state=inference_state)
+    self.request_raw_output[request_id][0].append(result)
+    
+    is_finished = False
+    if shard.is_last_layer():  # we got a new token out
+      token = await self.inference_engine.sample(result).item()
+      self.buffered_token_output[request_id][0].append(token)
+      is_finished = token == self.inference_engine.tokenizer.eos_token_id or len(self.buffered_token_output[request_id][0]) >= self.max_generate_tokens
+      if is_finished:
+        self.buffered_token_output[request_id] = (self.buffered_token_output[request_id][0], True)
+        self.request_raw_output[request_id] = (self.buffered_token_output[request_id][0], True)
+      self.trigger_on_token_callbacks(request_id, self.buffered_token_output[request_id][0], is_finished)
 
     asyncio.create_task(self.broadcast_result(request_id, self.buffered_token_output[request_id][0], is_finished))  # TODO: this is n^2 communication complexity
 
-    if result.size == 1:
-      self.buffered_token_output[request_id][0].append(result.item())
-      self.trigger_on_token_callbacks(request_id, self.buffered_token_output[request_id][0], is_finished)
 
     if DEBUG >= 2: print(f"[{request_id}] result size: {result.size}, is finished: {is_finished}, buffered tokens: {len(self.buffered_token_output[request_id][0])}")
 
@@ -232,18 +256,24 @@ class StandardNode(Node):
       request_id = str(uuid.uuid4())
     if request_id not in self.buffered_token_output:
       self.buffered_token_output[request_id] = ([], False)
+    if request_id not in self.request_raw_output:
+      self.request_raw_output[request_id] = ([], False)
     shard = self.get_current_shard(base_shard)
 
     try:
       if DEBUG >= 1: print(f"[{request_id}] process_tensor: {tensor.size=} {tensor.shape=}")
-      result, inference_state, is_finished = await self.inference_engine.infer_tensor(request_id, shard, tensor, inference_state=inference_state)
-      is_finished = is_finished or len(self.buffered_token_output[request_id][0]) >= self.max_generate_tokens
-      if is_finished:
-        self.buffered_token_output[request_id] = (self.buffered_token_output[request_id][0], True)
-      asyncio.create_task(self.broadcast_result(request_id, self.buffered_token_output[request_id][0], is_finished))  # TODO: this is n^2 communication complexity
-
-      if result.size == 1:  # we got a new token out
-        self.buffered_token_output[request_id][0].append(result.item())
+      result = await self.inference_engine.infer_prompt(request_id, shard, prompt, image_str, inference_state=inference_state)
+      self.request_raw_output[request_id][0].append(result)
+      
+      is_finished = False
+      if shard.is_last_layer():  # we got a new token out
+        token = await self.inference_engine.sample(result).item()
+        self.buffered_token_output[request_id][0].append(token)
+        is_finished = token == self.inference_engine.tokenizer.eos_token_id or len(self.buffered_token_output[request_id][0]) >= self.max_generate_tokens
+        if is_finished:
+          self.buffered_token_output[request_id] = (self.buffered_token_output[request_id][0], True)
+          self.request_raw_output[request_id] = (self.buffered_token_output[request_id][0], True)
+          
         self.trigger_on_token_callbacks(request_id, self.buffered_token_output[request_id][0], is_finished)
       if DEBUG >= 2: print(f"[{request_id}] result size: {result.size}, is finished: {is_finished}, buffered tokens: {len(self.buffered_token_output[request_id][0])}")
 
@@ -379,7 +409,7 @@ class StandardNode(Node):
       except Exception as e:
         print(f"Error collecting topology: {e}")
         traceback.print_exc()
-
+  
   async def get_inference_result(self, request_id: str) -> Tuple[Optional[np.ndarray], bool]:
     if request_id not in self.buffered_token_output:
       return None, False
