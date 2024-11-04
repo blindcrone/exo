@@ -205,7 +205,8 @@ class StandardNode(Node):
     shard = self.get_current_shard(base_shard)
     example_id = str(uuid.uuid4())
     callback = self.on_token.register("eval-wait-{callback_id}")
-    resp = await self.process_prompt(base_shard, self.inference_engine.decode(shard, example), example_id)
+    prompt = await self.inference_engine.decode(shard, example)
+    resp = await self.process_prompt(base_shard, prompt, example_id)
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
       raw: np.ndarray = np.array(self.buffered_logits[example_id][0])[:target.shape[0]]
