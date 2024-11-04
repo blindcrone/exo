@@ -214,7 +214,7 @@ class StandardNode(Node):
       raw: np.ndarray = np.array(self.buffered_logits[example_id][0])
       squeezed = np.reshape(raw, (-1, raw.shape[-1]))
       print(squeezed.shape)
-      return self.inference_engine.eval_metric(squeezed, target, length)
+      return self.inference_engine.eval_metric(squeezed[:target.shape[0]], target, length)
     else: 
       return None, None
         
