@@ -17,6 +17,12 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     self.shard_downloader = shard_downloader
     self.executor = ThreadPoolExecutor(max_workers=1)
 
+  async def sample(self, x):
+    y = mx.array(output_data)
+    logits = y[:, -1, :]
+    y = np.array(sample_logits(logits))
+    return y
+
   async def infer_prompt(self, request_id: str, shard: Shard, prompt: str, image_str: Optional[str] = None, inference_state: Optional[str] = None) -> (np.ndarray, str, bool):
     await self.ensure_shard(shard)
     loop = asyncio.get_running_loop()
@@ -31,17 +37,19 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
       input_ids = mx.array(await loop.run_in_executor(self.executor, self.tokenizer.encode, prompt))
       output_data: np.ndarray = np.array(await loop.run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, input_ids))
     if self.shard.is_last_layer():
-      output = mx.array(output_data)
-      logits = output[:, -1, :]
-      y = np.array(sample_logits(logits))
-      return y, "", y.item() == self.tokenizer.eos_token_id
+      sample = self.sample(output_data)
+      return sample, "", sample.item() == self.tokenizer.eos_token_id
     else:
       return output_data, "", False
 
   async def infer_tensor(self, request_id: str, shard: Shard, input_data: np.ndarray, inference_state: Optional[str] = None) -> (np.ndarray, str, bool):
     await self.ensure_shard(shard)
     output_data: np.ndarray = np.array(await asyncio.get_running_loop().run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, mx.array(input_data)))
-    return output_data, "", output_data.size == 1 and output_data.item() == self.tokenizer.eos_token_id
+    if self.shard.is_last_layer():
+      sample = self.sample(output_data)
+      return sample, "", sample.item() == self.tokenizer.eos_token_id
+    else:
+      return output_data, "", False
 
   async def ensure_shard(self, shard: Shard):
     if self.shard == shard:
