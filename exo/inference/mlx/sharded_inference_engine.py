@@ -23,7 +23,8 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     y = np.array(sample_logits(logits))
     return y
 
-  async def encode(self, prompt: str):
+  async def encode(self, shard: Shard, prompt: str):
+    await self.ensure_shard(shard)
     tokens = await asyncio.get_running_loop().run_in_executor(self.executor, self.tokenizer.encode, prompt)
     return tokens
     
