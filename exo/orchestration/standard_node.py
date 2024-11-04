@@ -208,10 +208,8 @@ class StandardNode(Node):
     resp = await self.process_tensor(base_shard, inputs[0], example_id)
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
-      output: np.ndarray = np.array(self.buffered_token_output[example_id][0])
-      output_array = inputs
-      output_array = output_array[0,:] = inputs[:length[0] - 1] 
-      print(output_array.shape, targets.shape)
+      output: np.ndarray = np.array(self.buffered_raw_output[example_id][0])[:length[0] - 1]
+      print(output.shape, targets.shape)
       return self.inference_engine.eval_metric(np.squeeze(output), targets, length[0])
     else: 
       return None, None
