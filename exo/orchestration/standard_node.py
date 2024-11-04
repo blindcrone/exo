@@ -207,7 +207,7 @@ class StandardNode(Node):
       example_id = str(uuid.uuid4())
     losses = []
     shard = self.get_current_shard(base_shard)
-    for (inp, target, length) in batch:
+    for inp, target, length in zip(*batch):
       example_id = str(uuid.uuid4())
       callback = node.on_token.register("eval-wait-{callback_id}")
       self.process_tensor(base_shard, inp, example_id)
