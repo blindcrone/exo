@@ -179,8 +179,8 @@ class StandardNode(Node):
       await self.forward_to_next_shard(shard, prompt, request_id, image_str=image_str, inference_state=inference_state)
       return
 
-    result, inference_state, is_finished = await self.inference_engine.infer_prompt(request_id, shard, prompt, image_str, inference_state=inference_state)
-    ret = await self.process_result(shard, result, is_finished, inference_state, request_id) 
+    result, is_finished = await self.inference_engine.infer_prompt(request_id, shard, prompt, image_str, inference_state=inference_state)
+    ret = await self.process_result(shard, result, is_finished, "", request_id) 
     return ret
 
   async def process_tensor(
@@ -241,8 +241,8 @@ class StandardNode(Node):
 
     if DEBUG >= 1: print(f"[{request_id}] process_tensor: {tensor.size=} {tensor.shape=}")
     try:
-      result, inference_state, is_finished = await self.inference_engine.infer_tensor(request_id, shard, tensor, inference_state=inference_state)
-      ret = await self.process_result(shard, result, is_finished, inference_state, request_id) 
+      result, is_finished = await self.inference_engine.infer_tensor(request_id, shard, tensor, inference_state=inference_state)
+      ret = await self.process_result(shard, result, is_finished, "", request_id) 
       return ret
     except Exception as e:
       print(f"Error processing tensor for shard {shard}: {e}")
