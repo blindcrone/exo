@@ -39,7 +39,7 @@ class StandardNode(Node):
     self.topology: Topology = Topology()
     self.device_capabilities = device_capabilities()
     self.buffered_token_output: Dict[str, Tuple[List[int], bool]] = {}
-    self.buffered_raw_output: Dict[str, Tuple[List[np.ndarray], bool]] = {}
+    self.buffered_raw_output: Dict[str, Tuple[np.ndarray, bool]] = {}
     self.max_generate_tokens = max_generate_tokens
     self.topology_viz = topology_viz
     self._on_token = AsyncCallbackSystem[str, Tuple[str, List[int], bool]]()
@@ -209,8 +209,8 @@ class StandardNode(Node):
     resp = await self.process_tensor(base_shard, inputs[0], example_id)
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
-      raw: np.ndarray = np.array(self.buffered_raw_output[example_id][0][:length[0]])
-      print(raw[0].shape, raw[1].shape)
+      raw = self.buffered_raw_output[example_id][0]
+      print(raw.shape)
       return self.inference_engine.eval_metric(raw, targets, length[0])
     else: 
       return None, None
