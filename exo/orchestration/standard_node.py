@@ -119,7 +119,7 @@ class StandardNode(Node):
       self.buffered_logits[request_id] = ([], False)
 
     for i in np.reshape(result, (-1, 1, result.shape[-1])):
-      self.buffered_logits[request_id][0].append(result)
+      self.buffered_logits[request_id][0].append(i)
 
     if shard.is_last_layer():
       result = await self.inference_engine.sample(result)
@@ -210,7 +210,7 @@ class StandardNode(Node):
     resp = await self.process_prompt(base_shard, prompt, example_id)
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
-      raw: np.ndarray = np.array(self.buffered_logits[example_id][0])[1:length]
+      raw: np.ndarray = np.array(self.buffered_logits[example_id][0])
       return self.inference_engine.eval_metric(raw, target, length)
     else: 
       return None, None
