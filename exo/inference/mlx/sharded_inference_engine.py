@@ -30,7 +30,8 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     y = x
     y = mx.array(targets)
     l = mx.array([lengths])
-    return masked_ce_from_logits(x, y, l)
+    loss, toks = masked_ce_from_logits(x, y, l)
+    return np.array(loss), toks
 
   async def sample(self, x):
     y = mx.array(x)
