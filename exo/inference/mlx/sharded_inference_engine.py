@@ -23,12 +23,13 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     y = np.array(sample_logits(logits))
     return y
 
+  async def encode(self, prompt: str):
+    tokens = await asyncio.get_running_loop().run_in_executor(self.executor, self.tokenizer.encode, prompt)
+    return tokens
+    
   async def infer_prompt(self, request_id: str, shard: Shard, prompt: str, inference_state: Optional[str] = None) -> (np.ndarray, bool):
-    await self.ensure_shard(shard)
-    loop = asyncio.get_running_loop()
-    input_ids = mx.array(await loop.run_in_executor(self.executor, self.tokenizer.encode, prompt))
-    output_data: np.ndarray = np.array(await loop.run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, input_ids))
-    return output_data
+    output_data = await self.infer_tensor(request_id, shard, await self.encode(prompt), inference_state)
+    return output_data 
 
   async def infer_tensor(self, request_id: str, shard: Shard, input_data: np.ndarray, inference_state: Optional[str] = None) -> (np.ndarray, bool):
     await self.ensure_shard(shard)
