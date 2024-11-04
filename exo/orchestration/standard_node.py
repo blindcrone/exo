@@ -123,6 +123,7 @@ class StandardNode(Node):
       result = await self.inference_engine.sample(result)
       
     self.buffered_raw_output[request_id][0].append(result)
+    print(result.shape)
     
     is_finished = result.size == 1 and result.item() == self.inference_engine.tokenizer.eos_token_id or len(self.buffered_token_output[request_id][0]) >= self.max_generate_tokens
 
