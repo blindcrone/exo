@@ -16,7 +16,6 @@ class InferenceEngine(ABC):
   async def infer_tensor(self, request_id: str, shard: Shard, input_data: np.ndarray, inference_state: Optional[str] = None) -> np.ndarray:
     pass
 
-
 def get_inference_engine(inference_engine_name: str, shard_downloader: 'ShardDownloader'):
   if DEBUG >= 2:
     print(f"get_inference_engine called with: {inference_engine_name}")

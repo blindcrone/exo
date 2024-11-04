@@ -28,8 +28,10 @@ from exo.viz.topology_viz import TopologyViz
 
 # parse args
 parser = argparse.ArgumentParser(description="Initialize GRPC Discovery")
-parser.add_argument("command", nargs="?", choices=["run"], help="Command to run")
+parser.add_argument("command", nargs="?", choices=["run", "eval", "train"], help="Command to run")
 parser.add_argument("model_name", nargs="?", help="Model name to run")
+parser.add_argument("--iters", type=int, default=600, help="Training iterations")
+parser.add_argument("--data", type=str, default="data/", help="Directory where training data lives")
 parser.add_argument("--node-id", type=str, default=None, help="Node ID")
 parser.add_argument("--node-host", type=str, default="0.0.0.0", help="Node host")
 parser.add_argument("--node-port", type=int, default=None, help="Node port")
