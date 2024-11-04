@@ -7,7 +7,7 @@ import time
 import traceback
 import uuid
 import numpy as np
-from exo.train.dataset import load_dataset
+from exo.train.dataset import load_dataset, iterate_batches
 from exo.networking.manual.manual_discovery import ManualDiscovery
 from exo.networking.manual.network_topology_config import NetworkTopology
 from exo.orchestration.standard_node import StandardNode
