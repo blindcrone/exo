@@ -37,7 +37,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
       input_ids = mx.array(await loop.run_in_executor(self.executor, self.tokenizer.encode, prompt))
       output_data: np.ndarray = np.array(await loop.run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, input_ids))
     if self.shard.is_last_layer():
-      sample = self.sample(output_data)
+      sample = await self.sample(output_data)
       return sample, "", sample.item() == self.tokenizer.eos_token_id
     else:
       return output_data, "", False
@@ -46,7 +46,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     await self.ensure_shard(shard)
     output_data: np.ndarray = np.array(await asyncio.get_running_loop().run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, mx.array(input_data)))
     if self.shard.is_last_layer():
-      sample = self.sample(output_data)
+      sample = await self.sample(output_data)
       return sample, "", sample.item() == self.tokenizer.eos_token_id
     else:
       return output_data, "", False
