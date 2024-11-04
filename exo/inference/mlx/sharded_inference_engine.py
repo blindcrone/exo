@@ -24,7 +24,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     self.shard_downloader = shard_downloader
     self.executor = ThreadPoolExecutor(max_workers=1)
 
-  def eval_metric(self, outputs, targets, length):
+  def eval_metric(self, outputs, targets, lengths):
     x = mx.array(outputs)
     y = mx.array(targets)
     l = mx.array([lengths])
