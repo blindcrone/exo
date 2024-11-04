@@ -210,7 +210,7 @@ class StandardNode(Node):
     if(shard.is_last_layer()):
       output: np.ndarray = np.array(self.buffered_token_output[example_id][0])
       output_array = inputs
-      output_array = output[:, :lengths-1] 
+      output_array = output[:, :length[0] - 1] 
       print(output_array.shape, targets.shape)
       return self.inference_engine.eval_metric(np.squeeze(output), targets[0], length[0])
     else: 
