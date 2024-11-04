@@ -207,7 +207,7 @@ class StandardNode(Node):
     example_id = str(uuid.uuid4())
     callback = self.on_token.register("eval-wait-{callback_id}")
     print(inputs.shape, targets.shape, length)
-    resp = await self.process_tensor(base_shard, inputs, example_id)
+    resp = await self.process_tensor(base_shard, inputs.item(), example_id)
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
       output: np.ndarray = np.array(self.buffered_raw_output[example_id][0]) 
