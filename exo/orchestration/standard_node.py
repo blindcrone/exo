@@ -213,7 +213,7 @@ class StandardNode(Node):
     if(shard.is_last_layer()):
       raw: np.ndarray = np.array(self.buffered_logits[example_id][0])
       squeezed = np.reshape(raw, (-1, raw.shape[-1]))
-      truncated = squeezed[:target.shape(0)]
+      truncated = squeezed[:target.shape[-1]]
       print(truncated.shape)
       return self.inference_engine.eval_metric(truncated, target, length)
     else: 
