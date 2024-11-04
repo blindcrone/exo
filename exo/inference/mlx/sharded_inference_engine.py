@@ -18,7 +18,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     self.executor = ThreadPoolExecutor(max_workers=1)
 
   async def sample(self, x):
-    y = mx.array(output_data)
+    y = mx.array(x)
     logits = y[:, -1, :]
     y = np.array(sample_logits(logits))
     return y
