@@ -222,7 +222,7 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
     index_iterator,
     iterate_batches(dataset, tokenizer, batch_size),
   ): 
-    losses, toks = await node.evaluate_batch(shard, batch, loss)
+    losses, toks = await node.evaluate_batch(shard, batch)
     batch_loss = (losses * toks).item()
     all_losses.append(batch_loss)
     ntokens += toks.item()
