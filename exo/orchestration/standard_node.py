@@ -212,8 +212,7 @@ class StandardNode(Node):
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
       raw: np.ndarray = np.array(self.buffered_logits[example_id][0])
-      squeezed = np.reshape(raw, (-1, raw.shape[-1]))
-      truncated = squeezed[:target.shape[-1]]
+      truncated = raw[:target.shape[-1]]
       print(truncated.shape)
       return self.inference_engine.eval_metric(truncated, target, length)
     else: 
