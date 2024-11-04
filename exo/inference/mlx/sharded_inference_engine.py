@@ -24,10 +24,10 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     self.shard_downloader = shard_downloader
     self.executor = ThreadPoolExecutor(max_workers=1)
 
-  def eval_metric(self, outputs, targets, lengths):
+  def eval_metric(self, outputs, targets, length):
     x = mx.array(outputs)
     y = mx.array(targets)
-    l = mx.array(lengths)
+    l = mx.array([lengths])
     return masked_ce_from_logits(x, y, l)
 
   async def sample(self, x):
