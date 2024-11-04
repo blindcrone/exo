@@ -211,7 +211,7 @@ class StandardNode(Node):
     if(shard.is_last_layer()):
       output: np.ndarray = np.array(self.buffered_raw_output[example_id][0]) 
       print(output.shape, targets.shape)
-      return self.inference_engine.eval_metric(output, targets, length[0])
+      return self.inference_engine.eval_metric(output, targets[0], length[0])
     else: 
       return None, None
         
