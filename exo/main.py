@@ -206,7 +206,7 @@ async def run_model_cli(node: Node, inference_engine: InferenceEngine, model_nam
   finally:
     node.on_token.deregister(callback_id)
 
-async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_name, data, batch_size):
+async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_name, data, batch_size, num_batches=-1):
   shard = model_base_shards.get(model_name, {}).get(inference_engine.__class__.__name__)
   if not shard:
     print(f"Error: Unsupported model '{model_name}' for inference engine {inference_engine.__class__.__name__}")
