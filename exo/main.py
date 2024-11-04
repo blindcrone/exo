@@ -222,12 +222,17 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
     index_iterator,
     iterate_batches(dataset, tokenizer, batch_size),
   ): 
-    losses, toks = await node.evaluate(shard, *batch)
-    if losses is not None:
-      batch_loss = (losses * toks).item()
-      all_losses.append(batch_loss)
-      ntokens += toks.item()
-      print(f"loss: {batch_loss}, tokens: {ntokens}")
+    batch_losses = []
+    batch_toks = []
+    for example, target, length in zip(*batch):
+      losses, toks = await node.evaluate(shard, ins, outs, lens)
+      if losses is not None:
+        batch_losses.append(losses)
+        batch_toks.append(toks)
+    batch_loss = (losses * toks).item()
+    all_losses.append(batch_loss)
+    ntokens += toks.item()
+    print(f"loss: {batch_loss}, tokens: {ntokens}")
   total_loss = np.sum(all_losses) / ntokens
   print(f"total | loss: {total_loss}, tokens: {ntokens}")
 
