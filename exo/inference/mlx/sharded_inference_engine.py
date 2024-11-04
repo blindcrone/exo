@@ -29,7 +29,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     return tokens
     
   async def infer_prompt(self, request_id: str, shard: Shard, prompt: str, inference_state: Optional[str] = None) -> (np.ndarray, bool):
-    output_data = await self.infer_tensor(request_id, shard, await self.encode(prompt), inference_state)
+    output_data = await self.infer_tensor(request_id, shard, await self.encode(shard, prompt), inference_state)
     return output_data 
 
   async def infer_tensor(self, request_id: str, shard: Shard, input_data: np.ndarray, inference_state: Optional[str] = None) -> (np.ndarray, bool):
