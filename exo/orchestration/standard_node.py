@@ -115,9 +115,11 @@ class StandardNode(Node):
       result = await self.inference_engine.sample(result)
     
     is_finished = result.size == 1 and result.item() == self.inference_engine.tokenizer.eos_token_id or len(self.buffered_token_output[request_id][0]) >= self.max_generate_tokens
-    if is_finished:
-      self.buffered_token_output[request_id] = (self.buffered_token_output[request_id][0], True)
+
     asyncio.create_task(self.broadcast_result(request_id, self.buffered_token_output[request_id][0], is_finished))  # TODO: this is n^2 communication complexity
+
+    if is_finished:
+      self.buffered_token_output[request_id][1] = True
 
     if result.size == 1:  # we got a new token out
       self.buffered_token_output[request_id][0].append(result.item())
