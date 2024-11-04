@@ -119,7 +119,6 @@ class StandardNode(Node):
       self.buffered_logits[request_id] = ([], False)
 
     for i in np.reshape(result, (-1, 1, result.shape[-1])):
-      print(i.shape)
       self.buffered_logits[request_id][0].append(i)
 
     if shard.is_last_layer():
@@ -214,7 +213,6 @@ class StandardNode(Node):
       truncated = raw[:target.shape[-1]]
       x = np.reshape(truncated, (1, -1, raw.shape[-1]))
       y = np.reshape(target, (1, -1))
-      print(x.shape, y.shape)
       return self.inference_engine.eval_metric(x, y, length)
     else: 
       return None, None
