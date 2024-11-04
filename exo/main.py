@@ -211,7 +211,7 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
   if not shard:
     print(f"Error: Unsupported model '{model_name}' for inference engine {inference_engine.__class__.__name__}")
     return
-  tokenizer = node.inference_engine
+  tokenizer = await resolve_tokenizer(shard.model_id)
   all_losses = []
   ntokens = 0
 
