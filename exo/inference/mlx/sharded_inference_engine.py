@@ -1,5 +1,6 @@
 import numpy as np
 import mlx.core as mx
+import mlx.nn as nn
 from ..inference_engine import InferenceEngine
 from .sharded_model import StatefulShardedModel, sample_logits
 from .sharded_utils import load_shard, get_image_from_str
