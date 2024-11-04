@@ -119,6 +119,7 @@ class StandardNode(Node):
       self.buffered_raw_output[request_id] = ([], False)
 
     self.buffered_raw_output[request_id][0].append(result)
+    print(result.shape)
 
     if shard.is_last_layer():
       result = await self.inference_engine.sample(result)
