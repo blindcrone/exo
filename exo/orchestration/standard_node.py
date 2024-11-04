@@ -118,7 +118,8 @@ class StandardNode(Node):
     if request_id not in self.buffered_logits:
       self.buffered_logits[request_id] = ([], False)
 
-    self.buffered_logits[request_id][0].append(result.squeeze())
+    print(result.shape)
+    self.buffered_logits[request_id][0].append(result)
 
     if shard.is_last_layer():
       result = await self.inference_engine.sample(result)
@@ -135,7 +136,7 @@ class StandardNode(Node):
 
     if is_finished:
       self.buffered_token_output[request_id] = (self.buffered_token_output[request_id][0], True)
-      self.buffered_logits[request_id] = (self.buffered_raw_output[request_id][0], True)
+      self.buffered_logits[request_id] = (self.buffered_logits[request_id][0], True)
     else:
       asyncio.create_task(self.forward_to_next_shard(shard, result, request_id, inference_state=inference_state))
 
@@ -209,7 +210,7 @@ class StandardNode(Node):
     resp = await self.process_prompt(base_shard, prompt, example_id)
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
-      raw: np.ndarray = np.array(self.buffered_logits[example_id][0])[:target.shape[0]]
+      raw: np.ndarray = np.array(self.buffered_logits[example_id][0])[1:length]
       return self.inference_engine.eval_metric(raw, target, length)
     else: 
       return None, None
