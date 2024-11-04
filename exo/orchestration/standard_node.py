@@ -217,7 +217,7 @@ class StandardNode(Node):
         output: np.ndarray = np.array(self.buffered_raw_output[example_id][0]) 
         loss, tok = self.inference_engine.eval_metric(output, target, length)
         losses.append(loss)
-        toks.append(tok)
+        toks.append(tok.item())
       
     return losses, toks
         
