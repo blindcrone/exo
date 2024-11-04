@@ -3,7 +3,8 @@ from pathlib import Path
 import numpy as np
 import json
 import mlx.core as mx
-def batch_array(tokens):
+
+def make_batch(tokens):
   lengths = [len(x) for x in tokens]
   batch_size = len(lengths)
 
@@ -13,12 +14,10 @@ def batch_array(tokens):
 
   # Pad to the max length
   batch_arr = np.zeros((batch_size, max(lengths)), np.int32)
+
   for j in range(batch_size):
     batch_arr[j, : lengths[j]] = tokens[j]
-  return np.array(batch_arr), lengths
-
-def make_batch(tokens):
-  batch, lengths = batch_array(tokens)
+  batch = np.array(batch_arr)
   return batch[:, :-1], batch[:, 1:], lengths
 
 def iterate_batches(dset, tokenizer, batch_size, train=False):
