@@ -216,7 +216,7 @@ class StandardNode(Node):
         output: np.ndarray = np.array(self.buffered_raw_output[example_id][0]) 
         losses.append(self.inference_engine.eval_metric(output, target, length))
       
-    return losses
+    return zip(*losses)
         
 
   async def process_tensor(
