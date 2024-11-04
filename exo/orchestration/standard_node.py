@@ -119,6 +119,7 @@ class StandardNode(Node):
       self.buffered_logits[request_id] = ([], False)
 
     for i in np.reshape(result, (-1, 1, result.shape[-1])):
+      print(i.shape)
       self.buffered_logits[request_id][0].append(i)
 
     if shard.is_last_layer():
