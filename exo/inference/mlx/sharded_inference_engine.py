@@ -9,13 +9,23 @@ from exo.download.shard_download import ShardDownloader
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+def masked_ce_from_logits(logits, targets, lengths):
+  # Mask padding tokens
+  length_mask = mx.arange(logits.shape[1])[None, :] < lengths[:, None]
 
+  # Calculate the loss
+  ce = nn.losses.cross_entropy(logits, targets) * length_mask
+  ntoks = length_mask.sum()
+  return ce.sum() / ntoks, ntoks
 
 class MLXDynamicShardInferenceEngine(InferenceEngine):
   def __init__(self, shard_downloader: ShardDownloader):
     self.shard = None
     self.shard_downloader = shard_downloader
     self.executor = ThreadPoolExecutor(max_workers=1)
+
+  def eval_metric(self, outputs, targets, lengths):
+    return masked_ce_from_logits(mx.array(outputs), mx.array(target), mx.array(lengths))
 
   async def sample(self, x):
     y = mx.array(x)

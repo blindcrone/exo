@@ -6,6 +6,8 @@ import logging
 import time
 import traceback
 import uuid
+import numpy as np
+from exo.train.dataset import load_dataset
 from exo.networking.manual.manual_discovery import ManualDiscovery
 from exo.networking.manual.network_topology_config import NetworkTopology
 from exo.orchestration.standard_node import StandardNode
@@ -32,6 +34,7 @@ parser.add_argument("command", nargs="?", choices=["run", "eval", "train"], help
 parser.add_argument("model_name", nargs="?", help="Model name to run")
 parser.add_argument("--iters", type=int, default=600, help="Training iterations")
 parser.add_argument("--data", type=str, default="data/", help="Directory where training data lives")
+parser.add_argument("--batch-size", type=int, default=1, help="Minibatch size.")
 parser.add_argument("--node-id", type=str, default=None, help="Node ID")
 parser.add_argument("--node-host", type=str, default="0.0.0.0", help="Node host")
 parser.add_argument("--node-port", type=int, default=None, help="Node port")
@@ -203,6 +206,30 @@ async def run_model_cli(node: Node, inference_engine: InferenceEngine, model_nam
   finally:
     node.on_token.deregister(callback_id)
 
+async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_name: str, loss, data):
+  shard = model_base_shards.get(model_name, {}).get(inference_engine.__class__.__name__)
+  if not shard:
+    print(f"Error: Unsupported model '{model_name}' for inference engine {inference_engine.__class__.__name__}")
+    return
+  tokenizer = node.inference_engine
+  all_losses = []
+  ntokens = 0
+
+  # num_batches can be -1 to indicate the entire set
+  index_iterator = iter(range(num_batches)) if num_batches != -1 else iter(int, 1)
+
+  for it, batch in zip(
+    index_iterator,
+    iterate_batches(dataset, tokenizer, batch_size),
+  ): 
+    losses, toks = await node.evaluate_batch(shard, batch, loss)
+    batch_loss = (losses * toks).item()
+    all_losses.append(batch_loss)
+    ntokens += toks.item()
+    print(f"batch {it} | loss: {batch_loss}, tokens: {ntokens}")
+
+  print(np.sum(all_losses) / ntokens
+   
 
 async def main():
   loop = asyncio.get_running_loop()
@@ -222,6 +249,15 @@ async def main():
       print("Error: Model name is required when using 'run' command or --run-model")
       return
     await run_model_cli(node, inference_engine, model_name, args.prompt)
+  elif args.command == "eval":
+    data_path = args.data
+    train, val, test = load_dataset(data_path)
+    model_name = args.model_name
+    if not model_name:
+      print("Error: Much like a human, I can't evaluate anything without a model")
+      return
+    await run_eval_cli(node, inference_engine, model_name, args.iters, args.batch_size, test_set)
+    
   else:
     asyncio.create_task(api.run(port=args.chatgpt_api_port))  # Start the API server as a non-blocking task
     await asyncio.Event().wait()

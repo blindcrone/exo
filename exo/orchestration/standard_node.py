@@ -44,6 +44,7 @@ class StandardNode(Node):
     self.max_generate_tokens = max_generate_tokens
     self.topology_viz = topology_viz
     self._on_token = AsyncCallbackSystem[str, Tuple[str, List[int], bool]]()
+    self._on_finish_inference = Dict[str, AsyncCallbackSystem[str, Tuple[str]]] = {}
     self._on_opaque_status = AsyncCallbackSystem[str, Tuple[str, str]]()
     self._on_opaque_status.register("node_status").on_next(self.on_node_status)
     self.node_download_progress: Dict[str, RepoProgressEvent] = {}
@@ -136,6 +137,7 @@ class StandardNode(Node):
 
     if is_finished:
       self.buffered_token_output[request_id] = (self.buffered_token_output[request_id][0], True)
+      self.buffered_raw_output[request_id] = (self.buffered_raw_output[request_id][0], True)
     else:
       asyncio.create_task(self.forward_to_next_shard(shard, result, request_id, inference_state=inference_state))
 
@@ -200,6 +202,22 @@ class StandardNode(Node):
     else:
       result = await self._process_tensor(base_shard, await self.encode_prompt(shard, prompt), request_id, inference_state=inference_state)
       return result
+
+  async def evaluate_batch(self, base_shard: Shard, batch, loss, request_id: Optional[str] = None):
+    for example in batch:
+      example_id = str(uuid.uuid4())
+    losses = []
+    shard = self.get_current_shard(base_shard)
+    for inp, target, length in batch:
+      example_id = str(uuid.uuid4())
+      callback = node.on_token.register("eval-wait-{callback_id}")
+      self.process_tensor(base_shard, inp, example_id)
+      callback.wait(_, tokens, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == request_id and is_finished, timeout=300)
+      if(shard.is_last_layer()):
+        losses.append(self.inference_engine.eval_metric(self.buffered_raw_output[example_id][0], target, length))
+      
+    return np.array(losses)
+        
 
   async def process_tensor(
     self,
@@ -464,7 +482,7 @@ class StandardNode(Node):
   def trigger_on_token_callbacks(self, request_id: str, tokens: List[int], is_finished: bool) -> None:
     if DEBUG >= 2: print(f"Triggering all on_token callbacks with {request_id=} num_tokens={len(tokens)} {is_finished=}")
     self.on_token.trigger_all(request_id, tokens, is_finished)
-
+  
   async def broadcast_result(self, request_id: str, result: List[int], is_finished: bool) -> None:
     async def send_result_to_peer(peer):
       try:
