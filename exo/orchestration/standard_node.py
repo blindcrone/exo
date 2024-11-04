@@ -39,7 +39,7 @@ class StandardNode(Node):
     self.topology: Topology = Topology()
     self.device_capabilities = device_capabilities()
     self.buffered_token_output: Dict[str, Tuple[List[int], bool]] = {}
-    self.buffered_raw_output: Dict[str, Tuple[List[np.ndarray], bool]] = {}
+    self.buffered_logits: Dict[str, Tuple[List[np.ndarray], bool]] = {}
     self.max_generate_tokens = max_generate_tokens
     self.topology_viz = topology_viz
     self._on_token = AsyncCallbackSystem[str, Tuple[str, List[int], bool]]()
@@ -115,11 +115,10 @@ class StandardNode(Node):
     if request_id not in self.buffered_token_output:
       self.buffered_token_output[request_id] = ([], False)
     
-    if request_id not in self.buffered_raw_output:
-      self.buffered_raw_output[request_id] = ([], False)
+    if request_id not in self.buffered_logits:
+      self.buffered_logits[request_id] = ([], False)
 
-    self.buffered_raw_output[request_id][0].append(result.squeeze())
-    print(self.buffered_raw_output[request_id][0][-1].shape)
+    self.buffered_logits[request_id][0].append(result.squeeze())
 
     if shard.is_last_layer():
       result = await self.inference_engine.sample(result)
@@ -136,7 +135,7 @@ class StandardNode(Node):
 
     if is_finished:
       self.buffered_token_output[request_id] = (self.buffered_token_output[request_id][0], True)
-      self.buffered_raw_output[request_id] = (self.buffered_raw_output[request_id][0], True)
+      self.buffered_logits[request_id] = (self.buffered_raw_output[request_id][0], True)
     else:
       asyncio.create_task(self.forward_to_next_shard(shard, result, request_id, inference_state=inference_state))
 
@@ -206,10 +205,10 @@ class StandardNode(Node):
     shard = self.get_current_shard(base_shard)
     example_id = str(uuid.uuid4())
     callback = self.on_token.register("eval-wait-{callback_id}")
-    resp = await self.process_tensor(base_shard, example, example_id)
+    resp = await self.process_prompt(base_shard, self.inference_engine.decode(example), example_id)
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
-      raw: np.ndarray = np.array(self.buffered_raw_output[example_id][0])[:target.shape[0]]
+      raw: np.ndarray = np.array(self.buffered_logits[example_id][0])[:target.shape[0]]
       return self.inference_engine.eval_metric(raw, target, length)
     else: 
       return None, None
