@@ -213,7 +213,7 @@ class StandardNode(Node):
     if(shard.is_last_layer()):
       raw: np.ndarray = np.array(self.buffered_logits[example_id][0])
       squeezed = np.reshape(raw, (-1, raw.shape[-1]))[:target.shape[-1]]
-      return self.inference_engine.eval_metric(raw, target, length)
+      return self.inference_engine.eval_metric(squeezed, target, length)
     else: 
       return None, None
         
