@@ -209,7 +209,7 @@ class StandardNode(Node):
     shard = self.get_current_shard(base_shard)
     for inp, target, length in zip(*batch):
       example_id = str(uuid.uuid4())
-      callback = node.on_token.register("eval-wait-{callback_id}")
+      callback = self.on_token.register("eval-wait-{callback_id}")
       self.process_tensor(base_shard, inp, example_id)
       _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
       if(shard.is_last_layer()):
