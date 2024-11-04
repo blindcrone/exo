@@ -213,8 +213,9 @@ class StandardNode(Node):
     if(shard.is_last_layer()):
       raw: np.ndarray = np.array(self.buffered_logits[example_id][0])
       truncated = raw[:target.shape[-1]]
-      print(truncated.shape)
-      return self.inference_engine.eval_metric(truncated, target, length)
+      reshaped = np.reshape(truncated, (1, -1, raw.shape[-1]))
+      print(reshaped.shape)
+      return self.inference_engine.eval_metric(reshaped, target, length)
     else: 
       return None, None
         
