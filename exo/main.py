@@ -225,7 +225,8 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
   ): 
     batch_losses = []
     batch_toks = []
-    for tqdm(example, target, length in zip(*batch), total=len(batch)):
+    print("Evaluating {len(dataset)} examples with batch_size {batch_size}")
+    for example, target, length in tqdm(zip(*batch), total=len(batch)):
       losses, toks = await node.evaluate(shard, example, target, length)
       if losses is not None:
         batch_losses.append(losses)
