@@ -214,7 +214,7 @@ class StandardNode(Node):
       raw: np.ndarray = np.array(self.buffered_logits[example_id][0])
       truncated = raw[:target.shape[-1]]
       x = np.reshape(truncated, (1, -1, raw.shape[-1]))
-      y = np.reshape(target, (-1, 1))
+      y = np.reshape(target, (1, -1))
       print(x.shape, y.shape)
       return self.inference_engine.eval_metric(x, y, length)
     else: 
