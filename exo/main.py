@@ -7,6 +7,7 @@ import time
 import traceback
 import uuid
 import numpy as np
+import tqdm
 from exo.train.dataset import load_dataset, iterate_batches
 from exo.networking.manual.manual_discovery import ManualDiscovery
 from exo.networking.manual.network_topology_config import NetworkTopology
@@ -224,7 +225,7 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
   ): 
     batch_losses = []
     batch_toks = []
-    for example, target, length in zip(*batch):
+    for tqdm(example, target, length in zip(*batch)):
       losses, toks = await node.evaluate(shard, example, target, length)
       if losses is not None:
         batch_losses.append(losses)
@@ -232,7 +233,6 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
     batch_loss = (losses * toks).item()
     all_losses.append(batch_loss)
     ntokens += toks.item()
-    print(f"loss: {batch_loss}, tokens: {ntokens}")
   total_loss = np.sum(all_losses) / ntokens
   print(f"total | loss: {total_loss}, tokens: {ntokens}")
 
