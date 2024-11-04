@@ -17,8 +17,8 @@ def make_batch(tokens):
 
   for j in range(batch_size):
     batch_arr[j, : lengths[j]] = tokens[j]
-  batch = mx.array(batch_arr)
-  return batch[:, :-1], batch[:, 1:], mx.array(lengths)
+  batch = np.array(batch_arr)
+  return batch[:, :-1], batch[:, 1:], lengths
 
 def iterate_batches(dset, tokenizer, batch_size, train=False):
 # Shuffle indices

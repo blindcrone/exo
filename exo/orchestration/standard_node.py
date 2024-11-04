@@ -202,13 +202,12 @@ class StandardNode(Node):
       result = await self._process_tensor(base_shard, await self.encode_prompt(shard, prompt), request_id, inference_state=inference_state)
       return result
 
-  async def evaluate_batch(self, base_shard: Shard, batch, request_id: Optional[str] = None):
+  async def evaluate_tensor(self, base_shard: Shard, batch, request_id: Optional[str] = None):
     for example in batch:
       example_id = str(uuid.uuid4())
     losses = []
     shard = self.get_current_shard(base_shard)
-    print(batch)
-    for inp, target, length in batch:
+    for inp, target, length in *batch:
       example_id = str(uuid.uuid4())
       callback = node.on_token.register("eval-wait-{callback_id}")
       self.process_tensor(base_shard, inp, example_id)
