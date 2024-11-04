@@ -206,6 +206,7 @@ class StandardNode(Node):
     for example in batch:
       example_id = str(uuid.uuid4())
     losses = []
+    toks = []
     shard = self.get_current_shard(base_shard)
     for inp, target, length in zip(*batch):
       example_id = str(uuid.uuid4())
@@ -214,9 +215,11 @@ class StandardNode(Node):
       _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
       if(shard.is_last_layer()):
         output: np.ndarray = np.array(self.buffered_raw_output[example_id][0]) 
-        losses.append(self.inference_engine.eval_metric(output, target, length))
+        loss, tok = self.inference_engine.eval_metric(output, target, length)
+        losses.append(loss)
+        toks.append(tok)
       
-    return zip(*losses)
+    return losses, toks
         
 
   async def process_tensor(
