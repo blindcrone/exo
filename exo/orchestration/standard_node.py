@@ -211,7 +211,7 @@ class StandardNode(Node):
     resp = await self.process_prompt(base_shard, prompt, example_id)
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
-      raw: np.ndarray = np.array(self.buffered_logits[example_id][0])
+      raw: np.ndarray = np.array(self.buffered_logits[example_id][0], squeeze_dim=1)
       return self.inference_engine.eval_metric(raw, target, length)
     else: 
       return None, None
