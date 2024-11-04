@@ -294,7 +294,7 @@ class StandardNode(Node):
     await target_peer.send_prompt(shard, prompt, request_id=request_id, inference_state=inference_state)
 
   async def encode_prompt(self, shard: Shard, prompt):
-    toks = await self.inference_engine.encode(prompt)
+    toks = await self.inference_engine.encode(shard, prompt)
     return toks
 
   async def forward_to_next_shard(
