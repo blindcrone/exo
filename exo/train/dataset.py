@@ -4,6 +4,7 @@ import numpy as np
 import json
 def make_batch(tokens):
   lengths = [len(x) for x in tokens]
+  batch_size = len(lengths)
 
   # Check if any sequence is longer than 2048 tokens
   if max(lengths) > 2048:
