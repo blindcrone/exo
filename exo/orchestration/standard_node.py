@@ -202,24 +202,19 @@ class StandardNode(Node):
       result = await self._process_tensor(base_shard, await self.encode_prompt(shard, prompt), request_id, inference_state=inference_state)
       return result
 
-  async def evaluate_batch(self, base_shard: Shard, batch, request_id: Optional[str] = None):
+  async def evaluate(self, base_shard: Shard, inputs, targets, length, request_id: Optional[str] = None):
     for example in batch:
       example_id = str(uuid.uuid4())
-    losses = []
-    toks = []
     shard = self.get_current_shard(base_shard)
-    for inp, target, length in zip(*batch):
-      example_id = str(uuid.uuid4())
-      callback = self.on_token.register("eval-wait-{callback_id}")
-      resp = await self.process_tensor(base_shard, inp, example_id)
-      _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
-      if(shard.is_last_layer()):
-        output: np.ndarray = np.array(self.buffered_raw_output[example_id][0]) 
-        loss, tok = self.inference_engine.eval_metric(output, target, length)
-        losses.append(loss)
-        toks.append(tok.item())
-      
-    return losses, toks
+    example_id = str(uuid.uuid4())
+    callback = self.on_token.register("eval-wait-{callback_id}")
+    resp = await self.process_tensor(base_shard, inp, example_id)
+    _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
+    if(shard.is_last_layer()):
+      output: np.ndarray = np.array(self.buffered_raw_output[example_id][0]) 
+      return self.inference_engine.eval_metric(output, targets, length)
+    else: 
+      return None, None
         
 
   async def process_tensor(
