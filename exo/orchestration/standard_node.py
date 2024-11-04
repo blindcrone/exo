@@ -192,6 +192,7 @@ class StandardNode(Node):
     if shard.start_layer != 0:
       if DEBUG >= 2: print(f"[{request_id}] forwarding to next shard: {base_shard=} {shard=} {prompt=}")
       await self.forward_to_next_shard(shard, prompt, request_id, inference_state=inference_state)
+      return None
     else:
       result = await self._process_tensor(request_id, shard, await self.encode_prompt(prompt), inference_state=inference_state)
       return result
