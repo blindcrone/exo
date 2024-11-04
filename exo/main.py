@@ -227,10 +227,9 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
       batch_loss = (losses * toks).item()
       all_losses.append(batch_loss)
       ntokens += toks.item()
-      print(f"batch {it} | loss: {batch_loss}, tokens: {ntokens}")
-
-  print(f"total | {np.sum(all_losses) / ntokens} | tokens: {ntokens}")
-   
+      print(f"loss: {batch_loss}, tokens: {ntokens}")
+  total_loss = np.sum(all_losses) / ntokens
+  print(f"total | loss: {total_loss}, tokens: {ntokens}")
 
 async def main():
   loop = asyncio.get_running_loop()
