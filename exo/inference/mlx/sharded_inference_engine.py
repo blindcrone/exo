@@ -36,20 +36,12 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     else:
       input_ids = mx.array(await loop.run_in_executor(self.executor, self.tokenizer.encode, prompt))
       output_data: np.ndarray = np.array(await loop.run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, input_ids))
-    if self.shard.is_last_layer():
-      sample = await self.sample(output_data)
-      return sample
-    else:
-      return output_data
+    return output_data
 
   async def infer_tensor(self, request_id: str, shard: Shard, input_data: np.ndarray, inference_state: Optional[str] = None) -> (np.ndarray, bool):
     await self.ensure_shard(shard)
     output_data: np.ndarray = np.array(await asyncio.get_running_loop().run_in_executor(self.executor, self.stateful_sharded_model.step, request_id, mx.array(input_data)))
-    if self.shard.is_last_layer():
-      sample = await self.sample(output_data)
-      return sample
-    else:
-      return output_data
+    return output_data
 
   async def ensure_shard(self, shard: Shard):
     if self.shard == shard:

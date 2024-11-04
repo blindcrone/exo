@@ -110,6 +110,9 @@ class StandardNode(Node):
   ):
     if request_id not in self.buffered_token_output:
       self.buffered_token_output[request_id] = ([], False)
+
+    if shard.is_last_layer():
+      result = await self.inference_engine.sample(result)
     
     is_finished = result.size == 1 and result.item() == self.inference_engine.tokenizer.eos_token_id or len(self.buffered_token_output[request_id][0]) >= self.max_generate_tokens
     if is_finished:
