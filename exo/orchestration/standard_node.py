@@ -212,7 +212,7 @@ class StandardNode(Node):
       example_id = str(uuid.uuid4())
       callback = node.on_token.register("eval-wait-{callback_id}")
       self.process_tensor(base_shard, inp, example_id)
-      callback.wait(_, tokens, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == request_id and is_finished, timeout=300)
+      _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
       if(shard.is_last_layer()):
         losses.append(self.inference_engine.eval_metric(self.buffered_raw_output[example_id][0], target, length))
       
