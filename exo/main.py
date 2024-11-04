@@ -228,7 +228,7 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
     ntokens += toks.item()
     print(f"batch {it} | loss: {batch_loss}, tokens: {ntokens}")
 
-  print(np.sum(all_losses) / ntokens
+  print(f"total | {np.sum(all_losses) / ntokens} | tokens: {ntokens}")
    
 
 async def main():
