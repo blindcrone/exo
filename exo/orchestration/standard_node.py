@@ -194,7 +194,7 @@ class StandardNode(Node):
       await self.forward_to_next_shard(shard, prompt, request_id, inference_state=inference_state)
       return None
     else:
-      result = await self._process_tensor(request_id, base_shard, await self.encode_prompt(shard, prompt), inference_state=inference_state)
+      result = await self._process_tensor(base_shard, await self.encode_prompt(shard, prompt), request_id, inference_state=inference_state)
       return result
 
   async def process_tensor(
