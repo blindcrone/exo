@@ -260,6 +260,38 @@ class StandardNode(Node):
       traceback.print_exc()
       return None
 
+  async def forward_tensor(
+    self,
+    shard: Shard,
+    target: Partition,
+    tensor: np.ndarray,
+    request_id: str,
+    inference_state: Optional[str] = None
+  ):
+    target_peer = next((p for p in self.peers if p.id() == target.node_id), None)`
+    if DEBUG >= 1: print(f"Sending tensor to {target_peer.id()}: {tensor_or_prompt}")
+    if not target_peer:
+      raise ValueError(f"Peer for {next_partition} not found")
+    
+    await target_peer.send_tensor(shard, tensor, request_id=request_id, inference_state=inference_state)
+    
+  async def forward_prompt(
+    self,
+    shard: Shard,
+    target: Partition,
+    tensor: np.ndarray,
+    request_id: str,
+    image_str: Optional[str] = None,
+    inference_state: Optional[str] = None
+  ):
+    target_peer = next((p for p in self.peers if p.id() == target.node_id), None)
+    if DEBUG >= 1: print(f"Sending prompt to {target_peer.id()}: {tensor_or_prompt}")
+    if not target_peer:
+      raise ValueError(f"Peer for {next_partition} not found")
+
+    await target_peer.send_prompt(shard, prompt, image_str=image_str, request_id=request_id, inference_state=inference_state)
+
+
   async def forward_to_next_shard(
     self,
     base_shard: Shard,
@@ -282,24 +314,17 @@ class StandardNode(Node):
       next_partition: Partition = partitions[next_partition_index]
       next_shard = shards[next_partition_index]
       if DEBUG >= 2: print(f"Computed next from: {shard}, {self.topology}. Next partition: {next_partition}")
-
+      is_tensor = isinstance(tensor_or_prompt, np.ndarray)
       if next_partition.node_id == self.id:
-        if isinstance(tensor_or_prompt, np.ndarray):
+        if is_tensor:
           await self.process_tensor(shard, tensor_or_prompt, request_id, inference_state=inference_state)
         else:
           await self.process_prompt(shard, tensor_or_prompt, image_str, request_id, inference_state=inference_state)
-        return
-
-      target_peer = next((p for p in self.peers if p.id() == next_partition.node_id), None)
-      if not target_peer:
-        raise ValueError(f"Peer for {next_partition} not found")
-
-      if DEBUG >= 1: print(f"Sending tensor_or_prompt to {target_peer.id()}: {tensor_or_prompt}")
-
-      if isinstance(tensor_or_prompt, np.ndarray):
-        await target_peer.send_tensor(next_shard, tensor_or_prompt, request_id=request_id, inference_state=inference_state)
       else:
-        await target_peer.send_prompt(next_shard, tensor_or_prompt, image_str=image_str, request_id=request_id, inference_state=inference_state)
+        if is_tensor:
+          await self.forward_tensor(next_shard, next_partition, tensor_or_prompt, request_id, inference_state) 
+        else:
+          await self.forward_prompt(next_shard, next_partition, tensor_or_prompt, request_id, image_str, inference_state) 
 
   def get_current_shard(self, base_shard: Shard) -> Shard:
     partitions = self.partitioning_strategy.partition(self.topology)
