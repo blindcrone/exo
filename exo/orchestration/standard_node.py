@@ -118,7 +118,7 @@ class StandardNode(Node):
     if request_id not in self.buffered_raw_output:
       self.buffered_raw_output[request_id] = ([], False)
 
-    self.buffered_raw_output[request_id][0].append(result)
+    self.buffered_raw_output[request_id][0].append(result.squeeze())
     print(result.shape)
 
     if shard.is_last_layer():
