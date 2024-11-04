@@ -137,7 +137,13 @@ class StandardNode(Node):
 
     return np.array(self.buffered_token_output[request_id][0]) if len(self.buffered_token_output[request_id][0]) > 0 else None
 
-  async def process_prompt(self, base_shard: Shard, prompt: str, image_str: Optional[str] = None, request_id: Optional[str] = None, inference_state: Optional[str] = None) -> Optional[np.ndarray]:
+  async def process_prompt(
+    self,
+    base_shard: Shard,
+    prompt: str,
+    request_id: Optional[str] = None,
+    inference_state: Optional[str] = None
+  ) -> Optional[np.ndarray]:
     shard = self.get_current_shard(base_shard)
     asyncio.create_task(
       self.broadcast_opaque_status(
@@ -149,14 +155,13 @@ class StandardNode(Node):
           "base_shard": base_shard.to_dict(),
           "shard": shard.to_dict(),
           "prompt": prompt,
-          "image_str": image_str,
           "inference_state": inference_state,
           "request_id": request_id,
         }),
       )
     )
     start_time = time.perf_counter_ns()
-    resp = await self._process_prompt(base_shard, prompt, image_str, request_id, inference_state)
+    resp = await self._process_prompt(base_shard, prompt, request_id, inference_state)
     end_time = time.perf_counter_ns()
     elapsed_time_ns = end_time - start_time
     asyncio.create_task(
@@ -169,7 +174,6 @@ class StandardNode(Node):
           "base_shard": base_shard.to_dict(),
           "shard": shard.to_dict(),
           "prompt": prompt,
-          "image_str": image_str,
           "inference_state": inference_state,
           "request_id": request_id,
           "elapsed_time_ns": elapsed_time_ns,
@@ -179,15 +183,15 @@ class StandardNode(Node):
     )
     return resp
 
-  async def _process_prompt(self, base_shard: Shard, prompt: str, image_str: Optional[str] = None, request_id: Optional[str] = None, inference_state: Optional[str] = None) -> Optional[np.ndarray]:
+  async def _process_prompt(self, base_shard: Shard, prompt: str, request_id: Optional[str] = None, inference_state: Optional[str] = None) -> Optional[np.ndarray]:
     if request_id is None:
       request_id = str(uuid.uuid4())
     shard = self.get_current_shard(base_shard)
 
-    if DEBUG >= 2: print(f"[{request_id}] process prompt: {base_shard=} {shard=} {prompt=} {image_str=}")
+    if DEBUG >= 2: print(f"[{request_id}] process prompt: {base_shard=} {shard=} {prompt=}")
     if shard.start_layer != 0:
-      if DEBUG >= 2: print(f"[{request_id}] forwarding to next shard: {base_shard=} {shard=} {prompt=} {image_str=}")
-      await self.forward_to_next_shard(shard, prompt, request_id, image_str=image_str, inference_state=inference_state)
+      if DEBUG >= 2: print(f"[{request_id}] forwarding to next shard: {base_shard=} {shard=} {prompt=}")
+      await self.forward_to_next_shard(shard, prompt, request_id, inference_state=inference_state)
       return
 
     result = await self.inference_engine.infer_prompt(request_id, shard, prompt, inference_state=inference_state)
@@ -281,7 +285,6 @@ class StandardNode(Node):
     target: Partition,
     tensor: np.ndarray,
     request_id: str,
-    image_str: Optional[str] = None,
     inference_state: Optional[str] = None
   ):
     target_peer = next((p for p in self.peers if p.id() == target.node_id), None)
@@ -289,7 +292,7 @@ class StandardNode(Node):
     if not target_peer:
       raise ValueError(f"Peer for {next_partition} not found")
 
-    await target_peer.send_prompt(shard, prompt, image_str=image_str, request_id=request_id, inference_state=inference_state)
+    await target_peer.send_prompt(shard, prompt, request_id=request_id, inference_state=inference_state)
 
 
   async def forward_to_next_shard(
@@ -297,7 +300,6 @@ class StandardNode(Node):
     base_shard: Shard,
     tensor_or_prompt: Union[np.ndarray, str],
     request_id: str,
-    image_str: Optional[str] = None,
     inference_state: Optional[str] = None,
   ) -> None:
     if not self.partitioning_strategy:
@@ -319,12 +321,12 @@ class StandardNode(Node):
         if is_tensor:
           await self.process_tensor(shard, tensor_or_prompt, request_id, inference_state=inference_state)
         else:
-          await self.process_prompt(shard, tensor_or_prompt, image_str, request_id, inference_state=inference_state)
+          await self.process_prompt(shard, tensor_or_prompt, request_id, inference_state=inference_state)
       else:
         if is_tensor:
           await self.forward_tensor(next_shard, next_partition, tensor_or_prompt, request_id, inference_state) 
         else:
-          await self.forward_prompt(next_shard, next_partition, tensor_or_prompt, request_id, image_str, inference_state) 
+          await self.forward_prompt(next_shard, next_partition, tensor_or_prompt, request_id, inference_state) 
 
   def get_current_shard(self, base_shard: Shard) -> Shard:
     partitions = self.partitioning_strategy.partition(self.topology)
