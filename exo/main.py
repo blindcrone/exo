@@ -219,14 +219,14 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
   # num_batches can be -1 to indicate the entire set
   index_iterator = iter(range(num_batches)) if num_batches != -1 else iter(int, 1)
 
-  for it, batch in zip(
+  for it, batch in tqdm(zip(
     index_iterator,
     iterate_batches(dataset, tokenizer, batch_size),
-  ): 
+  ), total=len(dataset) // batch_size): 
     batch_losses = []
     batch_toks = []
     print("Evaluating {len(dataset)} examples with batch_size {batch_size}")
-    for example, target, length in tqdm(zip(*batch), total=len(batch)):
+    for example, target, length in zip(*batch):
       losses, toks = await node.evaluate(shard, example, target, length)
       if losses is not None:
         batch_losses.append(losses)
