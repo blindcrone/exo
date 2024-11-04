@@ -190,7 +190,7 @@ class StandardNode(Node):
       await self.forward_to_next_shard(shard, prompt, request_id, image_str=image_str, inference_state=inference_state)
       return
 
-    result = await self.inference_engine.infer_prompt(request_id, shard, prompt, image_str, inference_state=inference_state)
+    result = await self.inference_engine.infer_prompt(request_id, shard, prompt, inference_state=inference_state)
     ret = await self.process_result(shard, result, "", request_id) 
     return ret
 
