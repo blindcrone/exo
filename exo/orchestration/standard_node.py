@@ -192,11 +192,9 @@ class StandardNode(Node):
     if shard.start_layer != 0:
       if DEBUG >= 2: print(f"[{request_id}] forwarding to next shard: {base_shard=} {shard=} {prompt=}")
       await self.forward_to_next_shard(shard, prompt, request_id, inference_state=inference_state)
-      return
-
-    result = await self.inference_engine.infer_prompt(request_id, shard, prompt, inference_state=inference_state)
-    ret = await self.process_result(shard, result, "", request_id) 
-    return ret
+    else:
+      result = await self._process_tensor(request_id, shard, await self.encode_prompt(prompt), inference_state=inference_state)
+      return result
 
   async def process_tensor(
     self,
@@ -294,6 +292,9 @@ class StandardNode(Node):
 
     await target_peer.send_prompt(shard, prompt, request_id=request_id, inference_state=inference_state)
 
+  async def encode_prompt(self, shard: Shard, prompt):
+    toks = await self.inference_engine.encode(prompt)
+    return toks
 
   async def forward_to_next_shard(
     self,
