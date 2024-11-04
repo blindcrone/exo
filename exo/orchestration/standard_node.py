@@ -17,7 +17,7 @@ from exo.viz.topology_viz import TopologyViz
 from exo.download.hf.hf_helpers import RepoProgressEvent
 from exo.inference.inference_engine import get_inference_engine, InferenceEngine
 from exo.download.hf.hf_shard_download import HFShardDownloader
-
+from exo.train.dataset import batch_array
 
 class StandardNode(Node):
   def __init__(
@@ -209,7 +209,7 @@ class StandardNode(Node):
     resp = await self.process_tensor(base_shard, inputs[0], example_id)
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
-      output: np.ndarray = np.array(self.buffered_raw_output[example_id][0]) 
+      output, _ = batch_array(self.buffered_raw_output[example_id][0])
       print(output.shape)
       return self.inference_engine.eval_metric(np.squeeze(output), targets[0], length[0])
     else: 
