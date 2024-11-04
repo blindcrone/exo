@@ -210,7 +210,7 @@ class StandardNode(Node):
     _, _, _ = await callback.wait(lambda _request_id, tokens, is_finished: _request_id == example_id and is_finished, timeout=300)
     if(shard.is_last_layer()):
       output: np.ndarray = np.array(self.buffered_raw_output[example_id][0]) 
-      return self.inference_engine.eval_metric(output, targets, length.item())
+      return self.inference_engine.eval_metric(output, targets, length[0])
     else: 
       return None, None
         
