@@ -203,8 +203,6 @@ class StandardNode(Node):
       return result
 
   async def evaluate(self, base_shard: Shard, inputs, targets, length, request_id: Optional[str] = None):
-    for example in batch:
-      example_id = str(uuid.uuid4())
     shard = self.get_current_shard(base_shard)
     example_id = str(uuid.uuid4())
     callback = self.on_token.register("eval-wait-{callback_id}")
