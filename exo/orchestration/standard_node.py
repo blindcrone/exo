@@ -268,7 +268,7 @@ class StandardNode(Node):
     request_id: str,
     inference_state: Optional[str] = None
   ):
-    target_peer = next((p for p in self.peers if p.id() == target.node_id), None)`
+    target_peer = next((p for p in self.peers if p.id() == target.node_id), None)
     if DEBUG >= 1: print(f"Sending tensor to {target_peer.id()}: {tensor_or_prompt}")
     if not target_peer:
       raise ValueError(f"Peer for {next_partition} not found")
