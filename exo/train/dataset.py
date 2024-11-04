@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import json
 import mlx.core as mx
-def batch_array(tokens, lengths)
+def batch_array(tokens):
   lengths = [len(x) for x in tokens]
   batch_size = len(lengths)
 
