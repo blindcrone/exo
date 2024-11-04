@@ -102,6 +102,10 @@ class StandardNode(Node):
   def get_topology_inference_engines(self) -> List[List[str]]:
     return self.topology_inference_engines_pool
   
+  async def encode_prompt(self, shard: Shard, prompt):
+    toks = await self.inference_engine.encode(shard, prompt)
+    return toks
+  
   async def process_result(
     self,
     shard,
@@ -292,12 +296,6 @@ class StandardNode(Node):
       raise ValueError(f"Peer for {next_partition} not found")
 
     await target_peer.send_prompt(shard, prompt, request_id=request_id, inference_state=inference_state)
-
-  async def encode_prompt(self, shard: Shard, prompt):
-    toks = await self.inference_engine.encode(shard, prompt)
-    return toks
-
-  
 
   async def forward_to_next_shard(
     self,
