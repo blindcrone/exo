@@ -225,8 +225,7 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
     batch_losses = []
     batch_toks = []
     for example, target, length in zip(*batch):
-      print(target.shape)
-      losses, toks = await node.evaluate(shard, example, target, length)
+      losses, toks = await node.evaluate(shard, example.unsqueeze(axis=-1), target.unsqueeze(axis=-1), length)
       if losses is not None:
         batch_losses.append(losses)
         batch_toks.append(toks)
