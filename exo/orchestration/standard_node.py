@@ -206,7 +206,7 @@ class StandardNode(Node):
     for example in batch:
       example_id = str(uuid.uuid4())
     losses = []
-    shard = self.get_current_shrd(base_shard)
+    shard = self.get_current_shard(base_shard)
     for (inp, target, length) in batch:
       example_id = str(uuid.uuid4())
       callback = node.on_token.register("eval-wait-{callback_id}")
