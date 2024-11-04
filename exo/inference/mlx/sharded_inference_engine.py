@@ -26,7 +26,8 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     self.executor = ThreadPoolExecutor(max_workers=1)
 
   def eval_metric(self, outputs, targets, lengths):
-    x = mx.array(outputs)
+    x = mx.array(outputs[:lengths])
+    y = x
     y = mx.array(targets)
     l = mx.array([lengths])
     return masked_ce_from_logits(x, y, l)
