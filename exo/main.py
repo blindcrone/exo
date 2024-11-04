@@ -237,6 +237,37 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
   total_loss = np.sum(all_losses) / ntokens
   print(f"total | loss: {total_loss}, tokens: {ntokens}")
 
+async def train_model_cli(node: Node, inference_engine: InferenceEngine, model_name, dataset, batch_size, iters):
+  shard = model_base_shards.get(model_name, {}).get(inference_engine.__class__.__name__)
+  if not shard:
+    print(f"Error: Unsupported model '{model_name}' for inference engine {inference_engine.__class__.__name__}")
+    return
+  tokenizer = await resolve_tokenizer(shard.model_id)
+  all_losses = []
+  ntokens = 0
+
+  # num_batches can be -1 to indicate the entire set
+  index_iterator = iter(range(num_batches)) if num_batches != -1 else iter(int, 1)
+
+  print("Training on {len(dataset)} examples with batch_size {batch_size}")
+  for n in range(iters):
+    for it, batch in tqdm(zip(
+      index_iterator,
+      iterate_batches(dataset, tokenizer, batch_size),
+    ), total=len(dataset) // batch_size): 
+      batch_losses = []
+      batch_toks = []
+      for example, target, length in zip(*batch):
+        losses, toks = await node.evaluate(shard, example, target, length)
+        if losses is not None:
+          batch_losses.append(losses)
+          batch_toks.append(toks)
+      batch_loss = (losses * toks).item()
+      all_losses.append(batch_loss)
+      ntokens += toks.item()
+    total_loss = np.sum(all_losses) / ntokens
+  print(f"total | loss: {total_loss}, tokens: {ntokens}")
+
 async def main():
   loop = asyncio.get_running_loop()
 
@@ -255,14 +286,20 @@ async def main():
       print("Error: Model name is required when using 'run' command or --run-model")
       return
     await run_model_cli(node, inference_engine, model_name, args.prompt)
-  elif args.command == "eval":
+  elif args.command == "eval" or args.command == 'train':
     data_path = args.data
     train, val, test = load_dataset(data_path)
     model_name = args.model_name
-    if not model_name:
-      print("Error: Much like a human, I can't evaluate anything without a model")
-      return
-    await eval_model_cli(node, inference_engine, model_name, test, args.batch_size)
+    if args.command == 'eval':
+      if not model_name:
+        print("Error: Much like a human, I can't evaluate anything without a model")
+        return
+      await eval_model_cli(node, inference_engine, model_name, test, args.batch_size)
+    else:
+      if not model_name:
+        print("Error: This train ain't leaving the station without a model")
+        return
+      await train_model_cli(node, inference_engine, model_name, test, args.batch_size, args.iters)
     
   else:
     asyncio.create_task(api.run(port=args.chatgpt_api_port))  # Start the API server as a non-blocking task
