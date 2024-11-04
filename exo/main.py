@@ -256,7 +256,7 @@ async def main():
     if not model_name:
       print("Error: Much like a human, I can't evaluate anything without a model")
       return
-    await eval_model_cli(node, inference_engine, model_name, test_set, args.batch_size)
+    await eval_model_cli(node, inference_engine, model_name, test, args.batch_size)
     
   else:
     asyncio.create_task(api.run(port=args.chatgpt_api_port))  # Start the API server as a non-blocking task
