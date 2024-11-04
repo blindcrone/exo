@@ -206,7 +206,7 @@ async def run_model_cli(node: Node, inference_engine: InferenceEngine, model_nam
   finally:
     node.on_token.deregister(callback_id)
 
-async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_name: str, loss, data):
+async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_name, data, batch_size):
   shard = model_base_shards.get(model_name, {}).get(inference_engine.__class__.__name__)
   if not shard:
     print(f"Error: Unsupported model '{model_name}' for inference engine {inference_engine.__class__.__name__}")
@@ -256,7 +256,7 @@ async def main():
     if not model_name:
       print("Error: Much like a human, I can't evaluate anything without a model")
       return
-    await run_eval_cli(node, inference_engine, model_name, args.iters, args.batch_size, test_set)
+    await eval_model_cli(node, inference_engine, model_name, test_set, args.batch_size)
     
   else:
     asyncio.create_task(api.run(port=args.chatgpt_api_port))  # Start the API server as a non-blocking task
