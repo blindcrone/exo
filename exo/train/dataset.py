@@ -18,7 +18,7 @@ def batch_array(tokens):
   return np.array(batch_arr), lengths
 
 def make_batch(tokens):
-  batch, lengths = batch_array(tokens, lengths)
+  batch, lengths = batch_array(tokens)
   return batch[:, :-1], batch[:, 1:], lengths
 
 def iterate_batches(dset, tokenizer, batch_size, train=False):
