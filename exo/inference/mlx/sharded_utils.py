@@ -158,6 +158,15 @@ def load_model_shard(
   model.eval()
   return model
 
+class ShardedModel(nn.Module):
+  def __init__(self, model, shard: Shard):
+    super().__init__()
+    self.model = model
+    self.shard = shard
+
+  def __call__(self, x):
+    y = self.model(x[None] if self.shard.is_first_layer() else x)
+    return y
 
 async def load_shard(
   model_path: str,
@@ -168,16 +177,17 @@ async def load_shard(
   lazy: bool = False,
 ) -> Tuple[nn.Module, TokenizerWrapper]:
   model = load_model_shard(model_path, shard, lazy, model_config)
+  sharded_model = ShardedModel(model, shard)
 
   # TODO: figure out a generic solution
   if model.model_type == "llava":
     processor = AutoProcessor.from_pretrained(model_path)
     processor.eos_token_id = processor.tokenizer.eos_token_id
     processor.encode = processor.tokenizer.encode
-    return model, processor
+    return sharded_model, processor
   else:
     tokenizer = load_tokenizer(model_path, tokenizer_config)
-    return model, tokenizer
+    return sharded_model, tokenizer
 
 
 async def get_image_from_str(_image_str: str):

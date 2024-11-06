@@ -41,13 +41,3 @@ class StatefulModel(nn.Module):
     y = self.model(x, cache=cache)
     return y
     
-class ShardedModel(nn.Module):
-  def __init__(self, model, shard: Shard):
-    super().__init__()
-    self.model = model
-    self.shard = shard
-
-  def __call__(self, x):
-    y = self.model(x[None] if self.shard.is_first_layer() else x)
-    return y
-
