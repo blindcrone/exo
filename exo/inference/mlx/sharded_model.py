@@ -28,7 +28,7 @@ class StatefulShardedModel:
 
     cache = self.caches[request_id]
 
-    output = self.model(x, cache=cache)
+    output = self.model(x[None] if self.shard.is_first_layer() else x, cache=cache)
     return output
 
   def init_cache(self, request_id: str):
