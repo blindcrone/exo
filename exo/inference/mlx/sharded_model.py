@@ -16,7 +16,7 @@ class StatefulShardedModel:
     self.max_caches = max_caches
     self.caches = OrderedDict()
 
-  def step(
+  def __call__(
     self,
     x,
     request_id: str,
@@ -28,15 +28,8 @@ class StatefulShardedModel:
 
     cache = self.caches[request_id]
 
-    output = self.model(x[None] if self.shard.is_first_layer() else x, cache=cache)
+    output = self.model(x, cache=cache)
     return output
-
-  def __call__(
-    self,
-    x,
-    request_id: str,
-  ) -> Generator[Tuple[mx.array, mx.array], None, None]:
-    return self.step(x, request_id, temp=temp)
 
   def init_cache(self, request_id: str):
     kv_heads = ([self.model.n_kv_heads]*len(self.model.layers) if isinstance(self.model.n_kv_heads, int) else self.model.n_kv_heads)
