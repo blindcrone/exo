@@ -68,7 +68,6 @@ def load_config(model_path: Path) -> dict:
     raise
   return config
 
-
 def load_model_shard(
   model_path: Path,
   shard: Shard,
@@ -131,6 +130,15 @@ def load_model_shard(
 
   model_class, model_args_class = _get_classes(config=config)
 
+  class ShardedModel(model_class):
+    def __init__(self, args: ModelArgs):
+      super().__init__(args)
+      self.shard = Shard.from_dict(args.shard)
+
+    def __call__(self, x):
+      y = super().__call__(x[None] if self.shard.is_first_layer() else x)
+      return y
+
   model_args = model_args_class.from_dict(config)
   model = model_class(model_args)
 
@@ -157,16 +165,6 @@ def load_model_shard(
 
   model.eval()
   return model
-
-class ShardedModel(nn.Module):
-  def __init__(self, model, shard: Shard):
-    super().__init__()
-    self.model = model
-    self.shard = shard
-
-  def __call__(self, x):
-    y = self.model(x[None] if self.shard.is_first_layer() else x)
-    return y
 
 async def load_shard(
   model_path: str,
