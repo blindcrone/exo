@@ -9,7 +9,7 @@ def masked_ce_from_logits(logits, targets, lengths):
   ntoks = length_mask.sum()
   return ce.sum() / ntoks, ntoks
 
-def length_masked_ce_loss(model, inputs, targets, lengths):
+def length_masked_ce_loss(model, inputs, targets, lengths, keep_logits=False):
   # Run model on inputs
   logits, _ = model(inputs)
   logits = logits.astype(mx.float32)
@@ -21,5 +21,5 @@ def length_masked_ce_loss(model, inputs, targets, lengths):
   ce = nn.losses.cross_entropy(logits, targets) * length_mask
   ntoks = length_mask.sum()
   ce = ce.sum() / ntoks
-  return ce, ntoks
+  return ce, ntoks, logits if keep_logits else ce, ntoks
 

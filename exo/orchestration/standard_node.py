@@ -29,6 +29,7 @@ class StandardNode(Node):
     max_generate_tokens: int = 1024,
     topology_viz: Optional[TopologyViz] = None,
     shard_downloader: Optional[HFShardDownloader] = None,
+    request_task: Dict[str, str] = {}
   ):
     self.id = _id
     self.inference_engine = inference_engine
@@ -218,7 +219,6 @@ class StandardNode(Node):
     else: 
       return None, None
         
-
   async def process_tensor(
     self,
     base_shard: Shard,

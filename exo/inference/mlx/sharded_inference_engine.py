@@ -45,6 +45,18 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     loss, toks = metric(x, y, l)
     return np.array(loss), toks
 
+  async def eval(self, shard: Shard, loss, inputs, targets, lengths, keep_logits=False):
+    await self.ensure_shard(shard)
+    x = mx.array(inputs)
+    y = mx.array(targets)
+    l = mx.array(lengths)
+    if keep_logits:
+      score, ntoks, logits = await asyncio.get_running_loop().run_in_executor(self.executor, loss, self.model, inputs, targets, lengths, keep_logits=keep_logits)
+      return np.array(score), np.array(ntoks), np.array(logits)
+    else:
+      score, ntoks = await asyncio.get_running_loop().run_in_executor(self.executor, loss, self.model, inputs, targets, lengths, keep_logits=keep_logits)
+      return np.array(score), np.array(ntoks)
+
   async def sample(self, x):
     y = mx.array(x)
     logits = y[:, -1, :]
