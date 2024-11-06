@@ -8,7 +8,6 @@ from mlx_lm.sample_utils import top_p_sampling
 
 from ..shard import Shard
 
-# TODO: support a speculative model so we can parallelise compute across devices
 class StatefulShardedModel:
   def __init__(self, shard: Shard, model: nn.Module, max_kv_size: int = 1024, max_caches: int = 2):
     self.shard = shard
@@ -19,11 +18,9 @@ class StatefulShardedModel:
 
   def step(
     self,
-    request_id: str,
     x,
+    request_id: str,
   ) -> Generator[Tuple[mx.array, mx.array], None, None]:
-    y = x
-
     if request_id not in self.caches:
       self.init_cache(request_id)
     else:
@@ -31,15 +28,15 @@ class StatefulShardedModel:
 
     cache = self.caches[request_id]
 
-    output = self.model(y[None] if self.shard.is_first_layer() else y, cache=cache)
+    output = self.model(x, cache=cache)
     return output
 
   def __call__(
     self,
-    request_id: str,
     x,
+    request_id: str,
   ) -> Generator[Tuple[mx.array, mx.array], None, None]:
-    return self.step(request_id, x, temp=temp)
+    return self.step(x, request_id, temp=temp)
 
   def init_cache(self, request_id: str):
     kv_heads = ([self.model.n_kv_heads]*len(self.model.layers) if isinstance(self.model.n_kv_heads, int) else self.model.n_kv_heads)
