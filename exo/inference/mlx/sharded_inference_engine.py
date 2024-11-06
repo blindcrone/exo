@@ -83,6 +83,5 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
         return asyncio.run(load_shard(model_path, shard))
 
       model_shard, self.tokenizer = await loop.run_in_executor(self.executor, load_shard_wrapper)
-      sharded_model = await loop.run_in_executor(self.executor, ShardedModel, model_shard, shard)
-      self.model = await loop.run_in_executor(self.executor, StatefulModel, sharded_model) 
       self.shard = shard
+      self.model = await loop.run_in_executor(self.executor, StatefulModel, sharded_model) 
