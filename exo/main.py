@@ -219,7 +219,7 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
   # num_batches can be -1 to indicate the entire set
   index_iterator = iter(range(num_batches)) if num_batches != -1 else iter(int, 1)
 
-  print("Evaluating {len(dataset)} examples with batch_size {batch_size}")
+  print(f"Evaluating {len(dataset)} examples with batch_size {batch_size}")
   for it, batch in tqdm(zip(
     index_iterator,
     iterate_batches(dataset, tokenizer, batch_size),
@@ -249,7 +249,7 @@ async def train_model_cli(node: Node, inference_engine: InferenceEngine, model_n
   # num_batches can be -1 to indicate the entire set
   index_iterator = iter(range(num_batches)) if num_batches != -1 else iter(int, 1)
 
-  print("Training on {len(dataset)} examples with batch_size {batch_size}")
+  print(f"Training on {len(dataset)} examples with batch_size {batch_size}")
   for n in range(iters):
     for it, batch in tqdm(zip(
       index_iterator,
