@@ -2,7 +2,7 @@ import numpy as np
 import mlx.core as mx
 import mlx.nn as nn
 from ..inference_engine import InferenceEngine
-from .sharded_model import StatefulShardedModel
+from .sharded_model import ShardedModel, StatefulModel
 from .sharded_utils import load_shard, get_image_from_str
 from .losses import masked_ce_from_logits
 from ..shard import Shard
@@ -67,7 +67,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
 
   async def infer_tensor(self, request_id: str, shard: Shard, input_data: np.ndarray, inference_state: Optional[str] = None) -> (np.ndarray, bool):
     await self.ensure_shard(shard)
-    output_data: np.ndarray = np.array(await asyncio.get_running_loop().run_in_executor(self.executor, self.stateful_sharded_model, mx.array(input_data), request_id))
+    output_data: np.ndarray = np.array(await asyncio.get_running_loop().run_in_executor(self.executor, self.model, mx.array(input_data), request_id))
     return output_data
 
   async def ensure_shard(self, shard: Shard):
@@ -83,5 +83,6 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
         return asyncio.run(load_shard(model_path, shard))
 
       model_shard, self.tokenizer = await loop.run_in_executor(self.executor, load_shard_wrapper)
-      self.stateful_sharded_model = await loop.run_in_executor(self.executor, StatefulShardedModel, shard, model_shard)
+      sharded_model = await loop.run_in_executor(ShardedModel, model_shard, shard)
+      self.model = await loop.run_in_executor(StatefulModel, sharded_model) 
       self.shard = shard

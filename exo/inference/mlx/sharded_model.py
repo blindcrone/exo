@@ -8,29 +8,14 @@ from mlx_lm.sample_utils import top_p_sampling
 
 from ..shard import Shard
 
-class StatefulShardedModel:
-  def __init__(self, shard: Shard, model: nn.Module, max_kv_size: int = 1024, max_caches: int = 2):
-    self.shard = shard
+class StatefulModel(nn.Module):
+  def __init__(self, model, max_kv_size: int = 1024, max_caches: int = 2):
+    super().__init__()
     self.model = model
     self.max_kv_size = max_kv_size
     self.max_caches = max_caches
     self.caches = OrderedDict()
-
-  def __call__(
-    self,
-    x,
-    request_id: str,
-  ) -> Generator[Tuple[mx.array, mx.array], None, None]:
-    if request_id not in self.caches:
-      self.init_cache(request_id)
-    else:
-      self.caches.move_to_end(request_id)
-
-    cache = self.caches[request_id]
-
-    output = self.model(x[None] if self.shard.is_first_layer() else x, cache=cache)
-    return output
-
+  
   def init_cache(self, request_id: str):
     kv_heads = ([self.model.n_kv_heads]*len(self.model.layers) if isinstance(self.model.n_kv_heads, int) else self.model.n_kv_heads)
     # if self.max_kv_size is not None:
@@ -44,3 +29,24 @@ class StatefulShardedModel:
       self.caches.popitem(last=False)
 
     self.caches[request_id] = cache
+
+  def __call__(self, x, request_id: str):
+    if request_id not in self.caches:
+      self.init_cache(request_id)
+    else:
+      self.caches.move_to_end(request_id)
+
+    cache = self.caches[request_id]
+
+    y = self.model(x, cache=cache)
+    return y
+    
+class ShardedModel(nn.Module):
+  def __init__(self, model, shard: Shard):
+    super().__init__()
+    self.model = model
+    self.shard = shard
+
+  def __call__(self, x, request_id: str):
+    return self.model(x[None] if self.shard.is_first_layer() else x)    
+
