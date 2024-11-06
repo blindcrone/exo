@@ -2,7 +2,7 @@ import numpy as np
 import mlx.core as mx
 import mlx.nn as nn
 from ..inference_engine import InferenceEngine
-from .sharded_model import StatefulShardedModel, sample_logits
+from .sharded_model import StatefulShardedModel
 from .sharded_utils import load_shard, get_image_from_str
 from ..shard import Shard
 from typing import Optional
@@ -10,14 +10,26 @@ from exo.download.shard_download import ShardDownloader
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-def masked_ce_from_logits(logits, targets, lengths):
-  # Mask padding tokens
-  length_mask = mx.arange(logits.shape[1])[None, :] < lengths[:, None]
+def sample_logits(
+  logits: mx.array,
+  temp: float = 0.0,
+  top_p: float = 1.0,
+  logit_bias: Optional[Dict[int, float]] = None
+) -> Tuple[mx.array, float]:
+  if logit_bias:
+    indices = mx.array(list(logit_bias.keys()))
+    values = mx.array(list(logit_bias.values()))
+    logits[:, indices] += values
 
-  # Calculate the loss
-  ce = nn.losses.cross_entropy(logits, targets) * length_mask
-  ntoks = length_mask.sum()
-  return ce.sum() / ntoks, ntoks
+  if temp == 0:
+    token = mx.argmax(logits, axis=-1)
+  else:
+    if top_p > 0 and top_p < 1.0:
+      token = top_p_sampling(logits, top_p, temp)
+    else:
+      token = mx.random.categorical(logits*(1/temp))
+
+  return token
 
 class MLXDynamicShardInferenceEngine(InferenceEngine):
   def __init__(self, shard_downloader: ShardDownloader):
