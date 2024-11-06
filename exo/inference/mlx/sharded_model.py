@@ -21,6 +21,7 @@ class StatefulShardedModel:
     x,
     request_id: str,
   ) -> Generator[Tuple[mx.array, mx.array], None, None]:
+    y = x
     if request_id not in self.caches:
       self.init_cache(request_id)
     else:
@@ -28,7 +29,7 @@ class StatefulShardedModel:
 
     cache = self.caches[request_id]
 
-    output = self.model(x, cache=cache)
+    output = self.model(y[None] if self.shard.is_first_layer() else y, cache=cache)
     return output
 
   def __call__(
