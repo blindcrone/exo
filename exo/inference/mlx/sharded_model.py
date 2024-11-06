@@ -47,7 +47,7 @@ class ShardedModel(nn.Module):
     self.model = model
     self.shard = shard
 
-  def __call__(self, x, request_id: str):
+  def __call__(self, x):
     y = self.model(x[None] if self.shard.is_first_layer() else x)
     return y
 
