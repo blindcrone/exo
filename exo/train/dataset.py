@@ -2,7 +2,6 @@
 from pathlib import Path
 import numpy as np
 import json
-import mlx.core as mx
 
 def make_batch(tokens):
   lengths = [len(x) for x in tokens]
