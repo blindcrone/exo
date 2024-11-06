@@ -124,7 +124,7 @@ class StandardNode(Node):
     if shard.is_last_layer():
       result = await self.inference_engine.sample(result)
     
-    self.inference_engine.ensure_shard(shard)
+    await self.inference_engine.ensure_shard(shard)
     is_finished = result.size == 1 and result.item() == self.inference_engine.tokenizer.eos_token_id or len(self.buffered_token_output[request_id][0]) >= self.max_generate_tokens
 
     asyncio.create_task(self.broadcast_result(request_id, self.buffered_token_output[request_id][0], is_finished))  # TODO: this is n^2 communication complexity
