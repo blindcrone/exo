@@ -67,7 +67,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
 
   async def infer_tensor(self, request_id: str, shard: Shard, input_data: np.ndarray, inference_state: Optional[str] = None) -> (np.ndarray, bool):
     await self.ensure_shard(shard)
-    output_data: np.ndarray = np.array(await asyncio.get_running_loop().run_in_executor(self.executor, self.rodel, mx.array(input_data), request_id))
+    output_data: np.ndarray = np.array(await asyncio.get_running_loop().run_in_executor(self.executor, self.model, mx.array(input_data), request_id))
     return output_data
 
   async def ensure_shard(self, shard: Shard):
