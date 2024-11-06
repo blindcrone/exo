@@ -42,7 +42,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     x = mx.array(outputs)
     y = mx.array(targets)
     l = mx.array([lengths])
-    loss, toks = masked_ce_from_logits(x, y, l)
+    loss, toks = metric(x, y, l)
     return np.array(loss), toks
 
   async def sample(self, x):
