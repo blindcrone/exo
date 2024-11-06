@@ -133,7 +133,7 @@ def load_model_shard(
   class ShardedModel(model_class):
     def __init__(self, args):
       super().__init__(args)
-      self.shard = Shard().from_dict(args.shard)
+      self.shard = Shard(args.shard.model_id, args.shard.start_layer, args.shard.end_layer, args.shard.n_layers)
 
     def __call__(self, x):
       y = super().__call__(x[None] if self.shard.is_first_layer() else x)
