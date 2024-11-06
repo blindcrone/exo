@@ -131,7 +131,7 @@ def load_model_shard(
   model_class, model_args_class = _get_classes(config=config)
 
   class ShardedModel(model_class):
-    def __init__(self, args: ModelArgs):
+    def __init__(self, args):
       super().__init__(args)
       self.shard = Shard.from_dict(args.shard)
 
