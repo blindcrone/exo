@@ -63,24 +63,24 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     #print(f"infer_tensor out -> {output_data}")
     return output_data
   
-  async def evaluate(self, request_id: str, shard: Shard, inputs, targets, lengths, loss: str = "length_masked_ce"):
+  async def evaluate(self, request_id: str, shard: Shard, inputs, targets, mask, loss: str = "length_masked_ce"):
     await self.ensure_shard(shard)
     await self.ensure_session('loss', lambda: loss_fns[loss])
     await self.ensure_session('task', lambda: ('eval', self.model.eval()))
     #print(f"evaluate in <- {inputs}")
     x = mx.array(inputs).astype(mx.int64) if self.shard.is_first_layer() else mx.array(inputs)
     y = mx.array(targets)
-    l = mx.array(lengths)
+    l = mx.array(mask)
     score = await asyncio.get_running_loop().run_in_executor(self.executor, self.session['loss'], self.model, x, y, l)
     #print(f"evaluate out -> {score}")
-    return np.array(score)
+    return np.array(score).reshape(inputs.shape[0], -1)
 
   async def update_model(self, grad, lval):
     await self.ensure_shard(shard)
     self.session['opt'].update(self.model, grad)
     mx.eval(self.model.parameters(), self.session['opt'].state, lval)
   
-  async def train(self, request_id: str, shard: Shard, inputs, targets, lengths, loss: str = "length_masked_ce", opt=optim.Adam, lr=1e-5):
+  async def train(self, request_id: str, shard: Shard, inputs, targets, mask, loss: str = "length_masked_ce", opt=optim.Adam, lr=1e-5):
     await self.ensure_shard(shard)
     await self.ensure_session('loss', lambda: loss_fns[loss])
     await self.ensure_session('LVaG', lambda: nn.value_and_grad(self.model, self.session['loss']))
@@ -89,7 +89,7 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
 
     x = mx.array(inputs).astype(mx.int64) if self.shard.is_first_layer() else mx.array(inputs)
     y = mx.array(targets)
-    l = mx.array(lengths)
+    l = mx.array(mask)
     loop = asyncio.get_running_loop()
     score, grad = await loop.run_in_executor(self.executor, self.session['LVaG'], self.model, x, y, l)
     loop.run_in_executor(self.executor, self.update_model, grad, score)

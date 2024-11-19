@@ -16,11 +16,12 @@ def batch_with_lengths(tokens, maxlen = None):
 
   # Pad to the max length
   batch_arr = np.zeros((batch_size, maxlen), np.int32)
+  mask = np.zeros_like(batch_arr)
 
   for j in range(batch_size):
     batch_arr[j, : lengths[j]] = tokens[j]
-  batch = np.array(batch_arr)
-  return batch[:, :-1], batch[:, 1:], np.array(lengths)
+    mask[j, : lengths[j]] = 1
+  return batch_arr[:, :-1], batch_arr[:, 1:], mask[:, 1:]
 
 def batch_chunk(batch_size):
   return lambda d, i: d[i:i + batch_size]

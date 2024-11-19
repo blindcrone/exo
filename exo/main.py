@@ -214,9 +214,9 @@ async def eval_model_cli(node: Node, inference_engine: InferenceEngine, model_na
   losses = []
   tokens = []
   for batch in tqdm(iterate_batches(test, batch_size), total=len(dataset) // batch_size):
-    _, _, lengths = batch
-    losses.append(np.sum(lengths * await node.enqueue_example(shard, *batch)))
-    tokens.append(np.sum(lengths))
+    _, _, mask = batch
+    tokens.append(np.sum(mask))
+    losses.append(np.sum(tokens[-1] * await node.enqueue_example(shard, *batch)))
   total_loss = np.sum(losses) / np.sum(tokens)
   print(f"total | loss: {total_loss}, tokens: {np.sum(tokens)}")
 
@@ -233,9 +233,9 @@ async def train_model_cli(node: Node, inference_engine: InferenceEngine, model_n
     losses = []
     tokens = []
     for batch in tqdm(iterate_batches(train, batch_size), total=len(train) // batch_size):
-      _, _, lengths = batch
-      losses.append(np.sum(lengths * await node.enqueue_example(shard, *batch, train=True)))
-      tokens.append(np.sum(lengths))
+      _, _, mask = batch
+      tokens.append(np.sum(mask))
+      losses.append(np.sum(tokens[-1] * await node.enqueue_example(shard, *batch, train=True)))
   total_loss = np.sum(losses) / np.sum(tokens)
   print(f"total | loss: {total_loss}, tokens: {np.sum(tokens)}")
 

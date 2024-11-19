@@ -194,17 +194,17 @@ class StandardNode(Node):
     base_shard: Shard,
     example: np.ndarray,
     target: np.ndarray, 
-    length: np.ndarray,
+    mask: np.ndarray,
     request_id: Optional[str] = None,
     train: bool = False,
   ):
     shard = self.get_current_shard(base_shard)
     if shard.is_first_layer():
-      resp = await self.process_example(shard, example, target, length, train, request_id)
+      resp = await self.process_example(shard, example, target, mask, train, request_id)
     else:
       if request_id is None:
         request_id = str(uuid.uuid4())
-      resp = await self.forward_example(shard, example, target, length, train, request_id, 0) 
+      resp = await self.forward_example(shard, example, target, mask, train, request_id, 0) 
     return resp
     
 
@@ -213,7 +213,7 @@ class StandardNode(Node):
     base_shard: Shard,
     example: np.ndarray,
     target: np.ndarray, 
-    length: np.ndarray,
+    mask: np.ndarray,
     train: bool = False,
     request_id: Optional[str] = None,
   ):
@@ -234,7 +234,7 @@ class StandardNode(Node):
       )
     )
     start_time = time.perf_counter_ns()
-    resp = await self._process_example(shard, example, target, length, train, request_id)
+    resp = await self._process_example(shard, example, target, mask, train, request_id)
     end_time = time.perf_counter_ns()
     elapsed_time_ns = end_time - start_time
     asyncio.create_task(
@@ -259,7 +259,7 @@ class StandardNode(Node):
     base_shard: Shard,
     example: np.ndarray,
     target: np.ndarray, 
-    length: np.ndarray,
+    mask: np.ndarray,
     train: bool = False,
     request_id: Optional[str] = None,
   ) -> Optional[np.ndarray]:
@@ -271,18 +271,18 @@ class StandardNode(Node):
       target = target.astype(int)
       if train:
         if shard.is_last_layer():
-          loss, grad = await self.inference_engine.train(request_id, shard, example, target, length)
+          loss, grad = await self.inference_engine.train(request_id, shard, example, target, mask)
         else:
           step = await self.inference_engine.infer_tensor(request_id, shard, example)
-          backgrad = await self.forward_example(shard, step, target, length, train, request_id, self.get_partition_index(offset = 1))
-          loss, grad = await self.inference_engine.train(request_id, shard, example, backgrad, length, loss="back_gradient")
+          backgrad = await self.forward_example(shard, step, target, mask, train, request_id, self.get_partition_index(offset = 1))
+          loss, grad = await self.inference_engine.train(request_id, shard, example, backgrad, mask, loss="back_gradient")
         return loss.reshape(example.shape[0], -1) if shard.is_first_layer() else grad
       else:
         if shard.is_last_layer():
-          loss = await self.inference_engine.evaluate(request_id, shard, example, target, length)
+          loss = await self.inference_engine.evaluate(request_id, shard, example, target, mask)
         else:
           step = await self.inference_engine.infer_tensor(request_id, shard, example)
-          loss = await self.forward_example(shard, step, target, length, train, request_id, self.get_partition_index(offset = 1))
+          loss = await self.forward_example(shard, step, target, mask, train, request_id, self.get_partition_index(offset = 1))
         return loss.reshape(example.shape[0], -1)
     except Exception as e:
       print(f"Error processing example for shard {shard}: {e}")
@@ -357,7 +357,7 @@ class StandardNode(Node):
     base_shard: Shard,
     step: np.ndarray,
     target: np.ndarray,
-    length: np.ndarray,
+    mask: np.ndarray,
     train: bool,
     request_id: str,
     target_index: int,
@@ -369,26 +369,9 @@ class StandardNode(Node):
     target_peer = next((p for p in self.peers if p.id() == target_id), None)
     if not target_peer:
       raise ValueError(f"peer for {target_index} not found")
-    if DEBUG >= 1: print(f"sending example to {target_peer.id()}: {step} => {target} ({length})")
-    ret = await target_peer.send_example(target_shard, step, target, length, request_id=request_id, train=train)
+    if DEBUG >= 1: print(f"sending example to {target_peer.id()}: {step} => {target} ({mask})")
+    ret = await target_peer.send_example(target_shard, step, target, mask, request_id=request_id, train=train)
     return ret
-
-  async def forward_loss(
-    self,
-    base_shard: Shard,
-    loss: np.ndarray,
-    request_id: str,
-    target_index: int,
-  ) -> None:
-    if DEBUG >= 1: print(f"target partition index: {target_index}")
-    target_id = self.partitioning_strategy.partition(self.topology)[target_index].node_id
-    target_shard = self.get_current_shard(base_shard, target_index)
-    if DEBUG >= 2: print(f"computed target from: {base_shard} {target_index}, {self.topology}. target shard: {target_shard}")
-    target_peer = next((p for p in self.peers if p.id() == target_id), None)
-    if not target_peer:
-      raise ValueError(f"peer for {target_index} not found")
-    if DEBUG >= 1: print(f"sending tensor to {target_peer.id()}: {loss}")
-    await target_peer.send_loss(target_shard, step, target, length, request_id=request_id)
 
   async def forward_prompt(
     self,

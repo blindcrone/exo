@@ -36,7 +36,7 @@ message ExampleRequest {
   Shard shard = 1;
   Tensor example = 2;
   Tensor target = 3;
-  Tensor length = 4;
+  Tensor mask = 4;
   bool train = 5;
   optional string request_id = 6;
 }
