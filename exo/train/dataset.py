@@ -21,6 +21,8 @@ def batch_with_lengths(tokens, maxlen = None):
   for j in range(batch_size):
     batch_arr[j, : lengths[j]] = tokens[j]
     mask[j, : lengths[j]] = 1
+
+  print(mask.shape)
   return batch_arr[:, :-1], batch_arr[:, 1:], mask[:, 1:]
 
 def batch_chunk(batch_size):
