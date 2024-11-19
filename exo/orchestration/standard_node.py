@@ -254,6 +254,37 @@ class StandardNode(Node):
     )
     return resp
 
+  async def _train_example(
+    self,
+    shard: Shard,
+    example: np.ndarray,
+    target: np.ndarray, 
+    mask: np.ndarray,
+    request_id: Optional[str] = None,
+  ) -> np.ndarray:
+    if shard.is_last_layer():
+      loss, grad = await self.inference_engine.train(request_id, shard, example, target, mask)
+    else:
+      step = await self.inference_engine.infer_tensor(request_id, shard, example)
+      backgrad = await self.forward_example(shard, step, target, mask, True, request_id, self.get_partition_index(offset = 1))
+      loss, grad = await self.inference_engine.train(request_id, shard, example, backgrad, mask, loss="back_gradient")
+    return loss if shard.is_first_layer() else grad
+    
+  async def _eval_example(
+    self,
+    shard: Shard,
+    example: np.ndarray,
+    target: np.ndarray, 
+    mask: np.ndarray,
+    request_id: Optional[str] = None,
+  ) -> np.ndarray:
+    if shard.is_last_layer():
+      loss = await self.inference_engine.evaluate(request_id, shard, example, target, mask)
+    else:
+      step = await self.inference_engine.infer_tensor(request_id, shard, example)
+      loss = await self.forward_example(shard, step, target, mask, False, request_id, self.get_partition_index(offset = 1))
+    return loss        
+
   async def _process_example(
     self,
     base_shard: Shard,
@@ -262,7 +293,7 @@ class StandardNode(Node):
     mask: np.ndarray,
     train: bool = False,
     request_id: Optional[str] = None,
-  ) -> Optional[np.ndarray]:
+  ) -> np.ndarray:
     if request_id is None:
       request_id = str(uuid.uuid4())
     shard = self.get_current_shard(base_shard)
@@ -270,20 +301,9 @@ class StandardNode(Node):
     try:
       target = target.astype(int)
       if train:
-        if shard.is_last_layer():
-          loss, grad = await self.inference_engine.train(request_id, shard, example, target, mask)
-        else:
-          step = await self.inference_engine.infer_tensor(request_id, shard, example)
-          backgrad = await self.forward_example(shard, step, target, mask, train, request_id, self.get_partition_index(offset = 1))
-          loss, grad = await self.inference_engine.train(request_id, shard, example, backgrad, mask, loss="back_gradient")
-        return loss.reshape(example.shape[0], -1) if shard.is_first_layer() else grad
+        result = await self._train_example(shard, example, target, mask, request_id)
       else:
-        if shard.is_last_layer():
-          loss = await self.inference_engine.evaluate(request_id, shard, example, target, mask)
-        else:
-          step = await self.inference_engine.infer_tensor(request_id, shard, example)
-          loss = await self.forward_example(shard, step, target, mask, train, request_id, self.get_partition_index(offset = 1))
-        return loss.reshape(example.shape[0], -1)
+        result = await self._eval_example(shard, example, target, mask, request_id)
     except Exception as e:
       print(f"Error processing example for shard {shard}: {e}")
       traceback.print_exc()
