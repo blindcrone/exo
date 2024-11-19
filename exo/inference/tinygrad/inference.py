@@ -12,7 +12,7 @@ from exo.inference.tinygrad.tinygrad_helpers import concat_weights, load
 from exo.download.shard_download import ShardDownloader
 from concurrent.futures import ThreadPoolExecutor
 from .stateful_model import StatefulModel
-from .losses import length_masked_ce_loss
+from .losses import loss_fns
 import asyncio
 
 Tensor.no_grad = False
@@ -87,18 +87,21 @@ class TinygradDynamicShardInferenceEngine(InferenceEngine):
     output_data = await asyncio.get_running_loop().run_in_executor(self.executor, lambda: self.model(Tensor(input_data), request_id).realize())
     return output_data.numpy()
 
-  async def evaluate(self, request_id: str, shard: Shard, inputs, targets, lengths, loss=length_masked_ce_loss):
+  async def evaluate(self, request_id: str, shard: Shard, inputs, targets, mask, loss="length_masked_ce"):
+    await self.ensure_shard(shard)
+    await self.ensure_session('loss', lambda: loss_fns[loss])
     def step(x, y, l):
       Tensor.training = False
       return self.session['loss'](self.model, x, y, l)
-    await self.ensure_shard(shard)
-    await self.ensure_session('loss', lambda: loss)
     await self.ensure_session('jit', lambda: TinyJit(step)) 
-    score = await asyncio.get_running_loop().run_in_executor(self.executor, lambda: self.session['jit'](Tensor(inputs), targets, lengths))
+    score = await asyncio.get_running_loop().run_in_executor(self.executor, lambda: self.session['jit'](Tensor(inputs), targets, mask))
     out = score.numpy()
     return out
   
-  async def train(self, request_id: str, shard: Shard, inputs, targets, lengths, loss=length_masked_ce_loss, opt=nn.optim.Adam, lr=1e-5):
+  async def train(self, request_id: str, shard: Shard, inputs, targets, mask, loss="length_masked_ce", opt=nn.optim.Adam, lr=1e-5):
+    await self.ensure_shard(shard)
+    await self.ensure_session('loss', lambda: loss_fns[loss])
+    await self.ensure_session('opt', lambda: opt(nn.state.get_parameters(self.model.model), lr=lr))
     def step(x, y, l):
       Tensor.training = True
       score = self.session['loss'](self.model, x, y, l)
@@ -106,14 +109,11 @@ class TinygradDynamicShardInferenceEngine(InferenceEngine):
       score.backward()
       self.session['opt'].step()
       return score
-    await self.ensure_shard(shard)
-    await self.ensure_session('loss', lambda: loss)
-    await self.ensure_session('opt', lambda: opt(nn.state.get_parameters(self.model.model), lr=lr))
     await self.ensure_session('jit', lambda: TinyJit(step)) 
       
-    score = await asyncio.get_running_loop().run_in_executor(self.executor, lambda: self.session['jit'](Tensor(inputs), targets, lengths).realize())
+    score = await asyncio.get_running_loop().run_in_executor(self.executor, lambda: self.session['jit'](Tensor(inputs), targets, mask).realize())
     
-    return loss.numpy(), loss.numpy()
+    return score.numpy().reshape(inputs.shape[0], -1), score.numpy()
 
   async def ensure_shard(self, shard: Shard):
     if self.shard == shard:
