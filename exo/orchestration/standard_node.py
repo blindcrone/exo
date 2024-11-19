@@ -259,7 +259,7 @@ class StandardNode(Node):
     shard: Shard,
     example: np.ndarray,
     target: np.ndarray, 
-    mask: np.ndarray,
+    length: np.ndarray,
     request_id: Optional[str] = None,
   ) -> np.ndarray:
     if shard.is_last_layer():
