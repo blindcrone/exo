@@ -1,18 +1,25 @@
 from tinygrad import Tensor, dtypes
 import numpy as np
-def length_masked_ce_loss(model, inputs, targets, mask):
+def length_masked_ce_loss(model, inputs, targets, lengths):
   # Run model on inputs
   logits = model(inputs).cast(dtypes.float32).contiguous()
 
+  #Calculate length mask
+  length_mask = Tensor.arange(inputs.shape[1])[None, :] < lengths[:, None]
+  
   # Calculate the loss
-  ce = logits.sparse_categorical_crossentropy(Tensor(targets, requires_grad=False)).mul(mask)
-  loss = ce.sum() / mask.sum()
+  ce = logits.sparse_categorical_crossentropy(Tensor(targets, requires_grad=False)).mul(length_mask)
+  loss = ce.sum() / length_mask.sum()
   return loss
 
-def back_gradient_loss(model, inputs, gradients, mask):
+def back_gradient_loss(model, inputs, gradients, lengths):
   out = model(inputs).cast(dtypes.float32).contiguous()
-  logits = (out.sum(axis=-1) * mask)
-  loss = (logits * gradients).sum() / mask.sum()
+  
+  #Calculate length mask
+  length_mask = Tensor.arange(inputs.shape[1])[None, :] < lengths[:, None]
+
+  approximation = (out.sum(axis=-1) * length_mask * gradients)
+  loss = approximation.sum() / length_mask.sum()
   return loss
 
 loss_fns = {
